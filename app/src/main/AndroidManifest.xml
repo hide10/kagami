@@ -5,8 +5,12 @@
     <uses-feature
         android:name="android.hardware.camera.front"
         android:required="true" />
+    <!-- CAMERA 権限から暗黙に必須になる背面カメラ等を打ち消す（前面カメラ専用端末を配布対象に残す） -->
     <uses-feature
-        android:name="android.hardware.camera.any"
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
         android:required="false" />
 
     <application
