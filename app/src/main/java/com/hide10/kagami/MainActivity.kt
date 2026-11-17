@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.hardware.display.DisplayManager
+import android.view.Display
 import android.view.Surface
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -274,6 +275,11 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
     // エッジ表示を切り替えたら、前のフレームは捨てる。
     LaunchedEffect(uiState.edgeMode) { edgeBitmap = null }
 
+    fun currentRotation(displayManager: DisplayManager): Int =
+        previewView.display?.rotation
+            ?: displayManager.getDisplay(Display.DEFAULT_DISPLAY)?.rotation
+            ?: Surface.ROTATION_0
+
     // 表示の回転（180度の反転を含む）を DisplayListener で拾う。
     DisposableEffect(Unit) {
         val displayManager =
@@ -282,11 +288,11 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
             override fun onDisplayAdded(displayId: Int) {}
             override fun onDisplayRemoved(displayId: Int) {}
             override fun onDisplayChanged(displayId: Int) {
-                displayRotation = previewView.display?.rotation ?: Surface.ROTATION_0
+                displayRotation = currentRotation(displayManager)
             }
         }
         displayManager.registerDisplayListener(listener, null)
-        displayRotation = previewView.display?.rotation ?: Surface.ROTATION_0
+        displayRotation = currentRotation(displayManager)
         onDispose { displayManager.unregisterDisplayListener(listener) }
     }
 
