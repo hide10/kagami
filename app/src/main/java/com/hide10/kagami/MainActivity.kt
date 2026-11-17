@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.hardware.display.DisplayManager
 import android.view.Surface
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -63,7 +64,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -79,6 +79,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -137,6 +139,8 @@ fun KagamiApp(viewModel: MirrorViewModel = viewModel()) {
             try {
                 val provider = ProcessCameraProvider.awaitInstance(context)
                 hasFrontCamera = provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 providerError = true
             }
@@ -237,7 +241,6 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val configuration = LocalConfiguration.current
 
     val previewView = remember {
         PreviewView(context).apply {
@@ -257,6 +260,8 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
     var retryKey by remember { mutableIntStateOf(0) }
     var edgeBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var sliderDragging by remember { mutableStateOf(false) }
+    val edgeGeneration = remember { AtomicInteger(0) }
+    var displayRotation by remember { mutableIntStateOf(Surface.ROTATION_0) }
 
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) {
@@ -269,10 +274,30 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
     // エッジ表示を切り替えたら、前のフレームは捨てる。
     LaunchedEffect(uiState.edgeMode) { edgeBitmap = null }
 
+    // 表示の回転（180度の反転を含む）を DisplayListener で拾う。
+    DisposableEffect(Unit) {
+        val displayManager =
+            context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val listener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) {}
+            override fun onDisplayRemoved(displayId: Int) {}
+            override fun onDisplayChanged(displayId: Int) {
+                displayRotation = previewView.display?.rotation ?: Surface.ROTATION_0
+            }
+        }
+        displayManager.registerDisplayListener(listener, null)
+        displayRotation = previewView.display?.rotation ?: Surface.ROTATION_0
+        onDispose { displayManager.unregisterDisplayListener(listener) }
+    }
+
     // カメラのバインド。手ブレ補正・エッジ表示の切替と、失敗時の再試行で組み直す。
     LaunchedEffect(uiState.stabilizationEnabled, uiState.edgeMode, retryKey) {
+        bindFailed = false
+        val myGeneration = edgeGeneration.incrementAndGet()
         val provider = try {
             ProcessCameraProvider.awaitInstance(context)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             bindFailed = true
             return@LaunchedEffect
@@ -285,6 +310,8 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
         val stabSupported = try {
             val info = provider.getCameraInfo(CameraSelector.DEFAULT_FRONT_CAMERA)
             Preview.getPreviewCapabilities(info).isStabilizationSupported
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             false
         }
@@ -304,7 +331,10 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
                     .build()
                 analysis.setAnalyzer(
                     analysisExecutor,
-                    EdgeAnalyzer { bmp -> edgeBitmap = bmp },
+                    EdgeAnalyzer { bmp ->
+                        // 組み直し前の世代のフレームは表示しない。
+                        if (edgeGeneration.get() == myGeneration) edgeBitmap = bmp
+                    },
                 )
                 cases.add(analysis)
             }
@@ -321,11 +351,15 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
 
         camera = try {
             buildAndBind(uiState.stabilizationEnabled && stabSupported)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             // 手ブレ補正つきの構成が通らない端末では、補正なしで1回だけ組み直す。
             if (uiState.stabilizationEnabled && stabSupported) {
                 try {
                     buildAndBind(false)
+                } catch (e2: CancellationException) {
+                    throw e2
                 } catch (e2: Exception) {
                     bindFailed = true
                     null
@@ -349,10 +383,9 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
     }
 
     // 回転に合わせて、プレビューと解析の目標回転を更新する。
-    LaunchedEffect(configuration.orientation, previewUseCase, analysisUseCase) {
-        val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
-        previewUseCase?.targetRotation = rotation
-        analysisUseCase?.targetRotation = rotation
+    LaunchedEffect(displayRotation, previewUseCase, analysisUseCase) {
+        previewUseCase?.targetRotation = displayRotation
+        analysisUseCase?.targetRotation = displayRotation
     }
 
     // ズーム状態とカメラエラーの観測。
