@@ -21,6 +21,13 @@ data class FaceLandmarks(val leftEye: Pt, val rightEye: Pt, val nose: Pt, val mo
     val eyeMid get() = leftEye.midTo(rightEye)
     val eyeDist get() = leftEye.distTo(rightEye)
 
+    /**
+     * 画面の左右どちらに映る目か。鏡像なので、本人が自分の右目と思う目は画面の右に映る。
+     * ミラー後は leftEye/rightEye の名前と画面の左右が一致するとは限らないので、x で決める。
+     */
+    val screenLeftEye get() = if (leftEye.x <= rightEye.x) leftEye else rightEye
+    val screenRightEye get() = if (leftEye.x <= rightEye.x) rightEye else leftEye
+
     fun map(f: (Pt) -> Pt) = FaceLandmarks(f(leftEye), f(rightEye), f(nose), f(mouth))
 }
 

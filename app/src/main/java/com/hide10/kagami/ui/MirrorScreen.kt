@@ -156,7 +156,12 @@ private fun PreviewView.tint(color: ColorAdjust) {
     }
 }
 
-private val PARTS = listOf(FacePart.EYES to "目", FacePart.NOSE to "鼻", FacePart.MOUTH to "口")
+private val PARTS = listOf(
+    FacePart.LEFT_EYE to "左目",
+    FacePart.RIGHT_EYE to "右目",
+    FacePart.NOSE to "鼻",
+    FacePart.MOUTH to "口",
+)
 
 @Composable
 private fun Controls(state: MirrorState, vm: MirrorViewModel, modifier: Modifier) {

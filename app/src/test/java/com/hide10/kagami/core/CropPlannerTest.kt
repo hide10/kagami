@@ -55,11 +55,50 @@ class CropPlannerTest {
     @Test
     fun partBringsThatLandmarkToTheCenter() {
         val f = face(Pt(540f, 900f), 250f)
-        val expected = mapOf(FacePart.EYES to f.eyeMid, FacePart.NOSE to f.nose, FacePart.MOUTH to f.mouth)
+        val expected = mapOf(
+            FacePart.LEFT_EYE to Pt(415f, 900f),
+            FacePart.RIGHT_EYE to Pt(665f, 900f),
+            FacePart.NOSE to f.nose,
+            FacePart.MOUTH to f.mouth,
+        )
         for ((part, landmark) in expected) {
             val crop = CropPlanner.target(ViewIntent.Part(part), f, PHONE)
             assertPt(PHONE.center, screenOf(landmark, crop, PHONE))
             assertEquals(part.eyeFrac * PHONE.w / 250f, crop.zoom, 1e-3f)
+        }
+    }
+
+    /** 前面カメラの像はミラーで左右が入れ替わり、leftEye が画面の右に来る。 */
+    private val mirroredFace = ImageMapping(Size(480f, 640f), PHONE, mirror = true).toView(face(Pt(240f, 300f), 60f))
+
+    @Test
+    fun eyeButtonsFollowTheScreenSideNotTheLandmarkName() {
+        assertPt(Pt(630f, 900f), mirroredFace.leftEye)
+        val right = CropPlanner.target(ViewIntent.Part(FacePart.RIGHT_EYE), mirroredFace, PHONE)
+        val left = CropPlanner.target(ViewIntent.Part(FacePart.LEFT_EYE), mirroredFace, PHONE)
+        assertPt(PHONE.center, screenOf(Pt(630f, 900f), right, PHONE))
+        assertPt(PHONE.center, screenOf(Pt(450f, 900f), left, PHONE))
+    }
+
+    @Test
+    fun swappingTheEyeLandmarksDoesNotChangeWhichEyeIsShown() {
+        val swapped = mirroredFace.copy(leftEye = mirroredFace.rightEye, rightEye = mirroredFace.leftEye)
+        for (part in listOf(FacePart.LEFT_EYE, FacePart.RIGHT_EYE)) {
+            assertEquals(
+                "$part",
+                CropPlanner.target(ViewIntent.Part(part), mirroredFace, PHONE),
+                CropPlanner.target(ViewIntent.Part(part), swapped, PHONE),
+            )
+        }
+    }
+
+    @Test
+    fun oneEyeLeavesTheOtherOffScreen() {
+        val f = face(Pt(540f, 900f), 250f)
+        for ((part, other) in listOf(FacePart.LEFT_EYE to Pt(665f, 900f), FacePart.RIGHT_EYE to Pt(415f, 900f))) {
+            val crop = CropPlanner.target(ViewIntent.Part(part), f, PHONE)
+            val x = screenOf(other, crop, PHONE).x
+            assertTrue("$part shows the other eye at $x", x < 0f || x > PHONE.w)
         }
     }
 
