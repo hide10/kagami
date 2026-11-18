@@ -573,10 +573,10 @@ private fun PartBar(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) 
             Row(Modifier.fillMaxWidth()) {
                 val cell = Modifier.weight(1f)
                 val whole = state.target == null && state.pendingPart == null
-                GlyphButton("全体", cell, selected = whole, onClick = vm::showAll) { faceGlyph(null) }
+                GlyphButton("全体", cell, selected = whole, onClick = vm::showAll) { partGlyph(null) }
                 for ((part, name) in PARTS) {
                     GlyphButton(name, cell, selected = state.pendingPart == part, enabled = !state.frozen, onClick = { onPart(part) }) {
-                        faceGlyph(part)
+                        partGlyph(part)
                     }
                 }
             }
