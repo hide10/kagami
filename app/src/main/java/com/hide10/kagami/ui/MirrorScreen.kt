@@ -237,7 +237,7 @@ private fun BarButton(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .background(if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 4.dp),
         Alignment.Center,
     ) { Text(label, color = Color.White, fontSize = 16.sp) }
 }
