@@ -5,7 +5,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-private val RULES = TouchRules(slop = 20f, longPressMs = 500, twoFingerGapMs = 150, twoFingerTapMs = 400)
+private val RULES = TouchRules(
+    slop = 20f,
+    longPressMs = 500,
+    doubleTapMs = 300,
+    doubleTapSlop = 150f,
+    twoFingerGapMs = 150,
+    twoFingerTapMs = 400,
+)
 
 /** 画面と同じく、毎回いま置いている指と、離したばかりの指を届ける。届いた操作を seen にためる。 */
 private class Hand(rules: TouchRules = RULES) {
@@ -199,5 +206,134 @@ class TouchReaderTest {
         h.down(100, 1L to Pt(100f, 200f))
         h.up(150, 1)
         assertEquals(listOf(Gesture.Tap(Pt(100f, 200f))), h.seen)
+    }
+
+    private fun Hand.tap(t: Long, at: Pt) {
+        down(t, 1L to at)
+        up(t + 60, 1)
+    }
+
+    @Test
+    fun aQuickSecondTapNearbyIsADoubleTapInsteadOfASecondTap() {
+        val h = Hand()
+        h.tap(0, Pt(500f, 900f))
+        h.tap(300, Pt(560f, 860f))
+        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.DoubleTap), h.seen)
+    }
+
+    @Test
+    fun aThirdQuickTapStartsOverAsATap() {
+        val h = Hand()
+        h.tap(0, Pt(500f, 900f))
+        h.tap(200, Pt(500f, 900f))
+        h.tap(400, Pt(500f, 900f))
+        h.tap(600, Pt(500f, 900f))
+        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.DoubleTap, Gesture.Tap(Pt(500f, 900f)), Gesture.DoubleTap), h.seen)
+    }
+
+    @Test
+    fun aSecondTapThatComesLateOrFarAwayIsJustATap() {
+        val late = Hand()
+        late.tap(0, Pt(500f, 900f))
+        late.tap(361, Pt(500f, 900f))
+        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.Tap(Pt(500f, 900f))), late.seen)
+        val far = Hand()
+        far.tap(0, Pt(500f, 900f))
+        far.tap(200, Pt(500f, 1100f))
+        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.Tap(Pt(500f, 1100f))), far.seen)
+    }
+
+    @Test
+    fun aDragOrATwoFingerTapBetweenTapsBreaksTheDoubleTap() {
+        val h = Hand()
+        h.tap(0, Pt(500f, 900f))
+        h.down(100, 1L to Pt(500f, 900f))
+        h.move(130, 1L to Pt(500f, 950f))
+        h.up(160, 1)
+        h.tap(200, Pt(500f, 900f))
+        h.down(300, 1L to Pt(400f, 900f), 2L to Pt(600f, 900f))
+        h.up(350, 1, 2)
+        h.tap(400, Pt(500f, 900f))
+        assertTrue(Gesture.DoubleTap !in h.seen)
+        assertEquals(3, h.seen.count { it is Gesture.Tap })
+    }
+
+    @Test
+    fun holdingTheSecondTapIsALongPressNotADoubleTap() {
+        val h = Hand()
+        h.tap(0, Pt(500f, 900f))
+        h.down(200, 1L to Pt(500f, 900f))
+        h.clock(700)
+        h.up(800, 1)
+        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.LongPress), h.seen)
+    }
+
+    @Test
+    fun twoFingersMovedTogetherUpOrDownZoomByHowFarTheyMoved() {
+        val h = Hand()
+        h.down(0, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.move(20, 1L to Pt(400f, 990f), 2L to Pt(600f, 990f))
+        h.move(40, 1L to Pt(400f, 970f), 2L to Pt(600f, 970f))
+        h.move(60, 1L to Pt(403f, 940f), 2L to Pt(598f, 940f))
+        h.move(80, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.up(100, 1, 2)
+        assertEquals(listOf(Gesture.ZoomDrag(-20f), Gesture.ZoomDrag(-30f), Gesture.ZoomDrag(60f)), h.seen)
+    }
+
+    @Test
+    fun aTwoFingerDragWithOneFingerLaggingIsStillADrag() {
+        val h = Hand()
+        h.down(0, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.move(30, 1L to Pt(400f, 960f), 2L to Pt(600f, 975f))
+        assertEquals(listOf(Gesture.ZoomDrag(-32.5f)), h.seen)
+    }
+
+    @Test
+    fun twoFingersMovedTogetherSidewaysReportTheWholeWayFromWhereTheyStarted() {
+        val h = Hand()
+        h.down(0, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.move(30, 1L to Pt(430f, 1002f), 2L to Pt(630f, 1001f))
+        h.move(60, 1L to Pt(470f, 1000f), 2L to Pt(670f, 1000f))
+        h.move(90, 1L to Pt(450f, 1000f), 2L to Pt(650f, 1000f))
+        h.up(120, 1, 2)
+        assertEquals(
+            listOf(Gesture.ExposureDrag(30f, starts = true), Gesture.ExposureDrag(70f, starts = false), Gesture.ExposureDrag(50f, starts = false)),
+            h.seen,
+        )
+        h.down(500, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.move(530, 1L to Pt(370f, 1000f), 2L to Pt(570f, 1000f))
+        assertEquals(Gesture.ExposureDrag(-30f, starts = true), h.seen.last())
+    }
+
+    @Test
+    fun theDirectionIsDecidedOnceAndKeptUntilTheFingersLift() {
+        val h = Hand()
+        h.down(0, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.move(30, 1L to Pt(400f, 960f), 2L to Pt(600f, 960f))
+        h.move(60, 1L to Pt(480f, 960f), 2L to Pt(680f, 960f))
+        h.move(90, 1L to Pt(300f, 1000f), 2L to Pt(700f, 1000f))
+        h.up(120, 1, 2)
+        assertTrue("${h.seen}", h.seen.all { it is Gesture.ZoomDrag })
+        assertEquals(3, h.seen.size)
+    }
+
+    @Test
+    fun spreadingTheFingersIsAPinchEvenWhenOnlyOneFingerMoves() {
+        val h = Hand()
+        h.down(0, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.move(30, 1L to Pt(400f, 1000f), 2L to Pt(660f, 1000f))
+        assertEquals(listOf(Gesture.Move(Pt(500f, 1000f), Pt(30f, 0f), 1.3f)), h.seen)
+        h.move(60, 1L to Pt(400f, 950f), 2L to Pt(660f, 950f))
+        assertEquals(Gesture.Move(Pt(530f, 1000f), Pt(0f, -50f), 1f), h.seen.last())
+    }
+
+    @Test
+    fun liftingOneFingerDuringATwoFingerZoomKeepsZoomingWithoutAJump() {
+        val h = Hand()
+        h.down(0, 1L to Pt(400f, 1000f), 2L to Pt(600f, 1000f))
+        h.move(30, 1L to Pt(400f, 960f), 2L to Pt(600f, 960f))
+        h.up(60, 2)
+        h.move(90, 1L to Pt(400f, 950f))
+        assertEquals(listOf(Gesture.ZoomDrag(-40f), Gesture.ZoomDrag(-10f)), h.seen)
     }
 }

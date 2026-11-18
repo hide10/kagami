@@ -47,6 +47,26 @@ class ColorAdjustTest {
     }
 
     @Test
+    fun draggingRightBrightensAndAcrossTheWholeWidthCoversTheWholeRange() {
+        val width = 1080f
+        assertEquals(1f, ColorAdjust().withExposureDragged(0f, width / 4, width).exposureEv, 1e-6f)
+        assertEquals(-1f, ColorAdjust().withExposureDragged(0f, -width / 4, width).exposureEv, 1e-6f)
+        assertEquals(2f, ColorAdjust().withExposureDragged(-2f, width, width).exposureEv, 1e-6f)
+        assertEquals(2f, ColorAdjust().withExposureDragged(1f, width, width).exposureEv, 1e-6f)
+    }
+
+    @Test
+    fun aDragMovesTheExposureInThirdsCountedFromWhereItStarted() {
+        val width = 1080f
+        val third = width / 12
+        val kelvin = ColorAdjust(kelvin = 4000f)
+        assertEquals(1f / 3, kelvin.withExposureDragged(0f, third, width).exposureEv, 1e-6f)
+        assertEquals(4000f, kelvin.withExposureDragged(0f, third, width).kelvin, 0f)
+        assertEquals(0f, kelvin.withExposureDragged(0f, third * 0.4f, width).exposureEv, 0f)
+        assertEquals(-1f / 3, kelvin.withExposureDragged(1f / 3, -third * 1.6f, width).exposureEv, 1e-6f)
+    }
+
+    @Test
     fun slidersStopAtTheEndsOfTheirRange() {
         val high = ColorAdjust().withExposure(5f).withKelvin(20000f)
         assertEquals(2f, high.exposureEv, 0f)

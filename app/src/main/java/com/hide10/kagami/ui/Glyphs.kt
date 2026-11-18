@@ -15,11 +15,11 @@ import com.hide10.kagami.core.FacePart
 
 // アイコンの絵。24×24 の格子に描いてキャンバスの大きさまで広げ、選んでいる所や点いているものは ACCENT で描く。
 
-private val INK = Color.White
+internal val INK = Color.White
 private val FAINT = Color.White.copy(alpha = 0.55f)
-private val ACCENT = Color(0xFFFFD54F)
+internal val ACCENT = Color(0xFFFFD54F)
 
-private inline fun DrawScope.grid(block: DrawScope.() -> Unit) = scale(size.minDimension / 24f, Offset.Zero, block)
+internal inline fun DrawScope.grid(block: DrawScope.() -> Unit) = scale(size.minDimension / 24f, Offset.Zero, block)
 
 /** 顔の輪郭と目・鼻・口。part を ACCENT で大きく描き、null なら輪郭を ACCENT にして全体を表す。左目は画面の左に映る目で、左右は入れ替えない。 */
 internal fun DrawScope.faceGlyph(part: FacePart?) = grid {

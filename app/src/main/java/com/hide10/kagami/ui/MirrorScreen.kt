@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -166,6 +167,8 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         var layer by remember(size) { mutableStateOf(Crop.full(size)) }
         val frame = remember(size) { CameraFrame(size) }
         var focused by remember(size) { mutableStateOf<FocusMark?>(null) }
+        // 2 本指で横へ動かし始めたときの露出。動かした量はいつもここから測るので、1/3 段に丸めても小さな動きが消えない。
+        var exposureFrom by remember(size) { mutableFloatStateOf(0f) }
         LaunchedEffect(size) {
             // 切り出しはこの大きさのビュー座標なので、大きさが変わったら全体から始める。
             goLive()
@@ -224,6 +227,8 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                     }
                     vm.moveTo(CropPlanner.tap(g.at, crop, size, s.extent(size)))
                 }
+                // 1 回目のタップはもう寄ってピントも合わせたので、2 回目はライトだけを切り替え、もう一度は寄らない。
+                Gesture.DoubleTap -> vm.toggleLight()
                 Gesture.LongPress -> {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     toggleFreeze()
@@ -232,6 +237,15 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                 is Gesture.Move -> {
                     crop = CropPlanner.transform(crop, g.centroid, g.pan, g.zoom, size, s.extent(size))
                     vm.moveTo(crop)
+                }
+                // 右端のスライダーと同じく、上へ動かすと寄り、画面の高さいっぱいで 1 倍から最大まで動く。
+                is Gesture.ZoomDrag -> {
+                    crop = ZoomStrip.drag(crop, g.dy, size.h, size, s.extent(size))
+                    vm.moveTo(crop)
+                }
+                is Gesture.ExposureDrag -> {
+                    if (g.starts) exposureFrom = s.color.exposureEv
+                    vm.adjustColor { it.withExposureDragged(exposureFrom, g.dx, size.w) }
                 }
             }
         }
@@ -380,9 +394,19 @@ private fun HideSystemBars() {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hide() }
 }
 
+/** ダブルタップの 2 回目が 1 回目からずれてよい距離。Android の ViewConfiguration の doubleTapSlop と同じ。 */
+private val DOUBLE_TAP_SLOP = 100.dp
+
 /** 届いた指を TouchReader で読み分けて onGesture へ渡す。長押しは次の動きを待たず、決まる時刻に渡す。 */
 private suspend fun PointerInputScope.readTouches(onGesture: (Gesture) -> Unit) {
-    val reader = TouchReader(TouchRules(viewConfiguration.touchSlop, viewConfiguration.longPressTimeoutMillis))
+    val reader = TouchReader(
+        TouchRules(
+            slop = viewConfiguration.touchSlop,
+            longPressMs = viewConfiguration.longPressTimeoutMillis,
+            doubleTapMs = viewConfiguration.doubleTapTimeoutMillis,
+            doubleTapSlop = DOUBLE_TAP_SLOP.toPx(),
+        ),
+    )
     awaitPointerEventScope {
         while (true) {
             val wait = reader.deadline?.minus(SystemClock.uptimeMillis())

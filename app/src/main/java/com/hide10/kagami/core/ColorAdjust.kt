@@ -40,6 +40,9 @@ data class ColorAdjust(val exposureEv: Float = 0f, val kelvin: Float = Kelvin.NE
     /** 1/3 段刻みに丸めるので、真ん中付近へ戻せば無加工に戻る。 */
     fun withExposure(ev: Float) = copy(exposureEv = (ev.coerceIn(EV) * 3f).roundToInt() / 3f)
 
+    /** 動かし始めに fromEv だった露出を、指で横へ dx 動かしたあと。幅 width いっぱいで EV の端から端まで動き、右へ動かすと明るい。 */
+    fun withExposureDragged(fromEv: Float, dx: Float, width: Float) = withExposure(fromEv + dx / width * (EV.endInclusive - EV.start))
+
     /** 100K 刻みに丸めるので、6500K 付近へ戻せば無加工に戻る。 */
     fun withKelvin(k: Float) = copy(kelvin = (k.coerceIn(KELVIN) / 100f).roundToInt() * 100f)
 
