@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,6 +23,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.kbcode.kagami.R
+import com.kbcode.kagami.billing.LogoBillingState
 
 /** 指の操作ひとつ。操作の絵と、それでできることの一言。 */
 private class Hint(val icons: List<GestureIcon>, @StringRes val text: Int)
@@ -41,9 +43,9 @@ private val ICON_GAP = 4.dp
 /** 絵の列の幅。いちばん多く並ぶ行に合わせ、絵は右に寄せて一言のすぐ隣に置く。 */
 private val ICONS_WIDTH = HINTS.maxOf { it.icons.size }.let { ICON * it + ICON_GAP * (it - 1) }
 
-/** 指の操作を絵と一言で示す。外側のタップか「閉じる」で閉じる。 */
+/** 指の操作を絵と一言で示し、その下にロゴを消す買い切りを置く。外側のタップか「閉じる」で閉じる。 */
 @Composable
-fun HelpDialog(onDismiss: () -> Unit) {
+fun HelpDialog(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.close)) } },
@@ -61,6 +63,8 @@ fun HelpDialog(onDismiss: () -> Unit) {
                         Text(stringResource(hint.text), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                LogoPurchaseSection(billing, onBuy, onRestore)
             }
         },
     )

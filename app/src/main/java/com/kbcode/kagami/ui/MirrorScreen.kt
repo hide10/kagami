@@ -106,6 +106,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kbcode.kagami.R
+import com.kbcode.kagami.billing.LogoBillingState
 import com.kbcode.kagami.camera.CameraCrop
 import com.kbcode.kagami.camera.CameraFocus
 import com.kbcode.kagami.camera.FaceAnalyzer
@@ -133,7 +134,7 @@ import com.kbcode.kagami.core.ZoomStrip
 import kotlin.math.roundToInt
 
 @Composable
-fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
+fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> Unit, vm: MirrorViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val camera = remember { CameraCrop() }
     val faces = remember { FaceAnalyzer(camera) }
@@ -154,7 +155,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { goLive() }
 
     var help by remember { mutableStateOf(false) }
-    if (help) HelpDialog { help = false }
+    if (help) HelpDialog(billing, onBuy, onRestore) { help = false }
 
     val haptics = LocalHapticFeedback.current
     val light = state.light
@@ -285,6 +286,8 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                     },
                     Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(TRACK_WIDTH),
                 )
+                // 試用版の文字は部位の帯のすぐ上の左端に置く。全面のあいだはほかの UI と一緒に隠れ、映像だけになる。
+                if (billing.showLogo) TrialLogo(Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 4.dp))
             }
             PartBar(state, vm) { part ->
                 if (vm.request(part)) {

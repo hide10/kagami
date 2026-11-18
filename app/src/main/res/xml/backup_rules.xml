@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 購入済みかどうかは別の端末へ持ち越さず、その端末で Play に問い合わせて決める。 -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="logo_purchase.xml" />
+</full-backup-content>

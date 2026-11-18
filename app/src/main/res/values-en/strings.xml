@@ -43,4 +43,20 @@
     <string name="gesture_two_finger_vertical">Two-finger drag up or down</string>
     <string name="gesture_two_finger_horizontal">Two-finger drag sideways</string>
     <string name="gesture_two_finger_tap">Two-finger tap</string>
+
+    <string name="logo_trial_label">Kagami Mirror Trial</string>
+    <string name="billing_remove_logo">Remove logo</string>
+    <string name="billing_free_features">All features are free, with no limits. A one-time purchase removes the trial logo at the bottom left.</string>
+    <string name="billing_owned">Purchased</string>
+    <string name="billing_buy">Buy · %1$s</string>
+    <string name="billing_restore">Restore purchase</string>
+    <string name="billing_nothing_to_restore">No purchase to restore</string>
+    <string name="billing_checking">Checking Google Play…</string>
+    <string name="billing_purchasing">Finish the purchase in Google Play.</string>
+    <string name="billing_pending">Payment is pending. The logo goes away when it completes.</string>
+    <string name="billing_acknowledging">Confirming your purchase…</string>
+    <string name="billing_canceled">Purchase canceled. All features still work.</string>
+    <string name="billing_offline">Cannot reach Google Play. Your saved purchase is kept. Connect and try again.</string>
+    <string name="billing_unavailable">Not available on Google Play right now. All features still work.</string>
+    <string name="billing_error">Could not check the purchase. Please try again. All features still work.</string>
 </resources>
