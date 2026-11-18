@@ -12,7 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -187,13 +186,15 @@ private fun Controls(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart)
                 Panel.LIGHT -> LightPanel(state.light, vm)
                 null -> Unit
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                BarButton("全体") { vm.showAll() }
+            // 幅を等分する。360dp で 8 個なら 1 個 45dp で、いちばん長い「ライト」(14sp で 42dp)も 1 行に収まる。
+            Row(Modifier.fillMaxWidth()) {
+                val cell = Modifier.weight(1f)
+                BarButton("全体", cell) { vm.showAll() }
                 for ((part, label) in PARTS) {
-                    BarButton(label) { onPart(part) }
+                    BarButton(label, cell) { onPart(part) }
                 }
-                BarButton("色", state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
-                BarButton("ライト", state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }) { vm.toggleLight() }
+                BarButton("色", cell, state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
+                BarButton("ライト", cell, state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }) { vm.toggleLight() }
             }
         }
     }
@@ -246,13 +247,18 @@ private fun SliderRow(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BarButton(label: String, selected: Boolean = false, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+private fun BarButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     Box(
-        Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+        modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
             .background(if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent)
-            .combinedClickable(onLongClick = onLongClick, onClick = onClick)
-            .padding(horizontal = 4.dp),
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick),
         Alignment.Center,
-    ) { Text(label, color = Color.White, fontSize = 16.sp) }
+    ) { Text(label, color = Color.White, fontSize = 14.sp) }
 }
