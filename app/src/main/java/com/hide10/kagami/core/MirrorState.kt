@@ -5,10 +5,12 @@ enum class Panel { COLOR, LIGHT }
 /**
  * target は見せたい切り出しで、null は全体。動かすのはボタンと指だけで、顔を追いかけはしない。
  * pendingPart は押された部位ボタンで、顔が見つかったときに一度だけ寄る。
+ * frozen は止めた一枚を映しているあいだ。部位はカメラの今の顔で決めるので、止めているあいだは寄れない。
  */
 data class MirrorState(
     val target: Crop? = null,
     val pendingPart: FacePart? = null,
+    val frozen: Boolean = false,
     val color: ColorAdjust = ColorAdjust(),
     val light: ScreenLight = ScreenLight(),
     val panel: Panel? = null,
@@ -23,8 +25,13 @@ data class MirrorState(
     /** タップや指で決めた切り出し。押したばかりの部位ボタンは取り消す。 */
     fun moveTo(crop: Crop) = copy(target = crop, pendingPart = null)
 
-    /** 顔が見つかるまで見え方は変えない。続けて押せば最後の部位が残る。 */
-    fun request(part: FacePart) = copy(pendingPart = part)
+    /** 顔が見つかるまで見え方は変えない。続けて押せば最後の部位が残る。止めているあいだは受け付けない。 */
+    fun request(part: FacePart) = if (frozen) this else copy(pendingPart = part)
+
+    /** 見え方はそのままで止める。押したばかりの部位ボタンは取り消す。 */
+    fun freeze() = copy(frozen = true, pendingPart = null)
+
+    fun unfreeze() = copy(frozen = false)
 
     /** face はビュー座標。待っている部位がなければ何も変えない。 */
     fun faceFound(face: FaceLandmarks, size: Size) =

@@ -15,6 +15,7 @@ class MirrorStateTest {
         val s = MirrorState()
         assertNull(s.target)
         assertNull(s.pendingPart)
+        assertFalse(s.frozen)
         assertTrue(s.color.isNeutral)
         assertFalse(s.light.on)
         assertNull(s.panel)
@@ -58,6 +59,56 @@ class MirrorStateTest {
         val zoomed = MirrorState().request(FacePart.NOSE).faceFound(f, PHONE)
         assertNull(zoomed.showAll().target)
         assertNull(zoomed.request(FacePart.MOUTH).showAll().faceFound(f, PHONE).target)
+    }
+
+    @Test
+    fun freezingKeepsTheViewAndCancelsAPress() {
+        val frozen = MirrorState().moveTo(dragged).request(FacePart.NOSE).freeze()
+        assertTrue(frozen.frozen)
+        assertEquals(dragged, frozen.target)
+        assertNull(frozen.pendingPart)
+        assertEquals(dragged, frozen.faceFound(f, PHONE).target)
+    }
+
+    @Test
+    fun partButtonsDoNothingWhileFrozen() {
+        val frozen = MirrorState().moveTo(dragged).freeze()
+        assertEquals(frozen, frozen.request(FacePart.MOUTH))
+        assertEquals(dragged, frozen.request(FacePart.MOUTH).faceFound(f, PHONE).target)
+    }
+
+    @Test
+    fun fingersAndShowAllStillMoveTheFrozenView() {
+        val frozen = MirrorState().moveTo(dragged).freeze()
+
+        val pinched = frozen.moveTo(CropPlanner.transform(dragged, PHONE.center, Pt(40f, 0f), 2f, PHONE))
+        assertTrue(pinched.frozen)
+        assertEquals(6f, pinched.target!!.zoom, 1e-4f)
+
+        val tapped = frozen.moveTo(CropPlanner.tap(Pt(700f, 1000f), dragged, PHONE))
+        assertTrue(tapped.frozen)
+        assertPt(PHONE.center, screenOf(dragged.toSource(Pt(700f, 1000f), PHONE), tapped.target!!, PHONE))
+
+        val whole = frozen.showAll()
+        assertTrue(whole.frozen)
+        assertNull(whole.target)
+    }
+
+    @Test
+    fun goingLiveKeepsTheViewAndPartButtonsWorkAgain() {
+        val live = MirrorState().moveTo(dragged).freeze().unfreeze()
+        assertFalse(live.frozen)
+        assertEquals(dragged, live.target)
+        val zoomed = live.request(FacePart.NOSE).faceFound(f, PHONE)
+        assertPt(PHONE.center, screenOf(f.nose, zoomed.target!!, PHONE))
+    }
+
+    @Test
+    fun freezingTwiceOrGoingLiveWhileLiveChangesNothing() {
+        val frozen = MirrorState().moveTo(dragged).freeze()
+        assertEquals(frozen, frozen.freeze())
+        val live = MirrorState().moveTo(dragged)
+        assertEquals(live, live.unfreeze())
     }
 
     @Test
