@@ -63,7 +63,7 @@ class MirrorStateTest {
 
     @Test
     fun freezingKeepsTheViewAndCancelsAPress() {
-        val frozen = MirrorState().moveTo(dragged).request(FacePart.NOSE).freeze()
+        val frozen = MirrorState().moveTo(dragged).request(FacePart.NOSE).freeze(Crop.full(PHONE), PHONE)
         assertTrue(frozen.frozen)
         assertEquals(dragged, frozen.target)
         assertNull(frozen.pendingPart)
@@ -72,14 +72,14 @@ class MirrorStateTest {
 
     @Test
     fun partButtonsDoNothingWhileFrozen() {
-        val frozen = MirrorState().moveTo(dragged).freeze()
+        val frozen = MirrorState().moveTo(dragged).freeze(Crop.full(PHONE), PHONE)
         assertEquals(frozen, frozen.request(FacePart.MOUTH))
         assertEquals(dragged, frozen.request(FacePart.MOUTH).faceFound(f, PHONE).target)
     }
 
     @Test
     fun fingersAndShowAllStillMoveTheFrozenView() {
-        val frozen = MirrorState().moveTo(dragged).freeze()
+        val frozen = MirrorState().moveTo(dragged).freeze(Crop.full(PHONE), PHONE)
 
         val pinched = frozen.moveTo(CropPlanner.transform(dragged, PHONE.center, Pt(40f, 0f), 2f, PHONE))
         assertTrue(pinched.frozen)
@@ -96,7 +96,7 @@ class MirrorStateTest {
 
     @Test
     fun goingLiveKeepsTheViewAndPartButtonsWorkAgain() {
-        val live = MirrorState().moveTo(dragged).freeze().unfreeze()
+        val live = MirrorState().moveTo(dragged).freeze(Crop.full(PHONE), PHONE).unfreeze()
         assertFalse(live.frozen)
         assertEquals(dragged, live.target)
         val zoomed = live.request(FacePart.NOSE).faceFound(f, PHONE)
@@ -105,10 +105,46 @@ class MirrorStateTest {
 
     @Test
     fun freezingTwiceOrGoingLiveWhileLiveChangesNothing() {
-        val frozen = MirrorState().moveTo(dragged).freeze()
-        assertEquals(frozen, frozen.freeze())
+        val frozen = MirrorState().moveTo(dragged).freeze(Crop.full(PHONE), PHONE)
+        assertEquals(frozen, frozen.freeze(Crop.full(PHONE), PHONE))
         val live = MirrorState().moveTo(dragged)
         assertEquals(live, live.unfreeze())
+    }
+
+    /** カメラが 2 倍に切り出していた一枚を止めた。止めた一枚に映っているのは画面の (270..810, 480..1440) だけ。 */
+    private val frame = Crop(540f, 960f, 2f)
+
+    @Test
+    fun aFrozenFrameIsAllThereIsToShow() {
+        val frozen = MirrorState().moveTo(dragged).freeze(frame, PHONE)
+        assertEquals(frame, frozen.extent(PHONE))
+        assertEquals(frame, frozen.showAll().extent(PHONE))
+        assertNull(frozen.showAll().target)
+        assertEquals(Crop.full(PHONE), frozen.unfreeze().extent(PHONE))
+    }
+
+    @Test
+    fun freezingPullsTheWantedViewInsideTheFrozenFrame() {
+        val wide = MirrorState().moveTo(Crop(300f, 600f, 1.5f)).freeze(frame, PHONE)
+        assertEquals(frame, wide.target)
+        val inside = Crop(600f, 1000f, 4f)
+        assertEquals(inside, MirrorState().moveTo(inside).freeze(frame, PHONE).target)
+    }
+
+    @Test
+    fun goingLiveKeepsTheViewChosenWhileFrozen() {
+        val chosen = Crop(600f, 1000f, 5f)
+        val live = MirrorState().freeze(frame, PHONE).moveTo(chosen).unfreeze()
+        assertEquals(chosen, live.target)
+        assertNull(live.still)
+    }
+
+    @Test
+    fun aPartWhoseFaceWasNotFoundLeavesTheViewAlone() {
+        val held = MirrorState().moveTo(dragged)
+        val missed = held.request(FacePart.NOSE).partMissed()
+        assertEquals(held, missed)
+        assertEquals(dragged, missed.faceFound(f, PHONE).target)
     }
 
     @Test

@@ -197,4 +197,30 @@ class CropPlannerTest {
             assertShowsOnlyImage(crop, PHONE)
         }
     }
+
+    /** 止めた一枚(カメラが画面の左上寄りを 3 倍に切り出していた)。 */
+    private val frozen = Crop(300f, 500f, 3f)
+
+    @Test
+    fun whileFrozenPinchingOutStopsAtTheFrozenFrame() {
+        var crop = Crop(320f, 520f, 6f)
+        repeat(10) { crop = CropPlanner.transform(crop, PHONE.center, Pt(0f, 0f), 0.5f, PHONE, frozen) }
+        assertEquals(frozen, crop)
+    }
+
+    @Test
+    fun whileFrozenGesturesAndTapsNeverLeaveTheFrozenFrame() {
+        val rnd = Random(13)
+        var crop = frozen
+        repeat(2000) {
+            val centroid = Pt(rnd.nextFloat() * PHONE.w, rnd.nextFloat() * PHONE.h)
+            val pan = Pt(rnd.nextFloat() * 600f - 300f, rnd.nextFloat() * 600f - 300f)
+            crop = if (it % 7 == 0) {
+                CropPlanner.tap(centroid, crop, PHONE, frozen)
+            } else {
+                CropPlanner.transform(crop, centroid, pan, 0.5f + rnd.nextFloat(), PHONE, frozen)
+            }
+            assertShowsOnlyImage(crop.within(frozen, PHONE), PHONE)
+        }
+    }
 }

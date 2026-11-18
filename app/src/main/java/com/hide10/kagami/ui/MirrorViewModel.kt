@@ -26,11 +26,13 @@ class MirrorViewModel : ViewModel() {
     /** 部位を待ち始めたら true。止めているあいだは受け付けないので false で、顔を探さなくてよい。 */
     fun request(part: FacePart) = _state.updateAndGet { it.request(part) }.pendingPart == part
 
-    fun freeze() = _state.update { it.freeze() }
+    fun freeze(extent: Crop, size: Size) = _state.update { it.freeze(extent, size) }
 
     fun unfreeze() = _state.update { it.unfreeze() }
 
     fun faceFound(face: FaceLandmarks, size: Size) = _state.update { it.faceFound(face, size) }
+
+    fun partMissed() = _state.update { it.partMissed() }
 
     fun toggle(panel: Panel) = _state.update { it.toggle(panel) }
 

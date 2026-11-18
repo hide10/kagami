@@ -98,7 +98,8 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             vm.showAll()
             var last = withFrameNanos { it }
             while (true) withFrameNanos { now ->
-                crop = CropSmoother.step(crop, vm.state.value.target ?: Crop.full(size), (now - last) / 1e9f)
+                val s = vm.state.value
+                crop = CropSmoother.step(crop, s.target ?: s.extent(size), (now - last) / 1e9f)
                 last = now
             }
         }
@@ -115,10 +116,10 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(size) { detectTapGestures { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size)) } }
+                .pointerInput(size) { detectTapGestures { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size, vm.state.value.extent(size))) } }
                 .pointerInput(size) {
                     detectTransformGestures { centroid, pan, zoom, _ ->
-                        crop = CropPlanner.transform(crop, Pt(centroid.x, centroid.y), Pt(pan.x, pan.y), zoom, size)
+                        crop = CropPlanner.transform(crop, Pt(centroid.x, centroid.y), Pt(pan.x, pan.y), zoom, size, vm.state.value.extent(size))
                         vm.moveTo(crop)
                     }
                 },
@@ -139,7 +140,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                     preview.bitmap?.let {
                         still = it.asImageBitmap()
                         faces.cancel()
-                        vm.freeze()
+                        vm.freeze(Crop.full(size), size)
                     }
                 }
             },
