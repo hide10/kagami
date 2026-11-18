@@ -1,8 +1,10 @@
 package com.hide10.kagami.ui
 
+import android.app.Activity
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.view.View
+import android.view.WindowManager
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,8 +24,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,7 +38,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +64,7 @@ import com.hide10.kagami.core.ImageMapping
 import com.hide10.kagami.core.MirrorState
 import com.hide10.kagami.core.Panel
 import com.hide10.kagami.core.Pt
+import com.hide10.kagami.core.ScreenLight
 import com.hide10.kagami.core.Size
 import com.hide10.kagami.core.ViewIntent
 import kotlin.math.roundToInt
@@ -97,8 +105,28 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                     }
                 },
         )
+        if (state.light.on) LightFrame(state.light)
         Controls(state, vm, Modifier.align(Alignment.BottomCenter))
     }
+}
+
+/** 画面のふちを光らせて顔を照らす。出ているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。 */
+@Composable
+private fun LightFrame(light: ScreenLight) {
+    val window = (LocalContext.current as Activity).window
+    DisposableEffect(window) {
+        window.attributes = window.attributes.apply { screenBrightness = 1f }
+        onDispose {
+            window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        }
+    }
+    val c = light.color()
+    Box(
+        Modifier.fillMaxSize().drawBehind {
+            val width = 72.dp.toPx()
+            inset(width / 2) { drawRect(Color(c.r, c.g, c.b), style = Stroke(width)) }
+        },
+    )
 }
 
 @Composable
@@ -135,13 +163,18 @@ private fun Controls(state: MirrorState, vm: MirrorViewModel, modifier: Modifier
     // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
     Surface(modifier.fillMaxWidth(), color = Color.Black.copy(alpha = 0.35f), contentColor = Color.White) {
         Column(Modifier.navigationBarsPadding().padding(vertical = 4.dp)) {
-            if (state.panel == Panel.COLOR) ColorPanel(state.color, vm)
+            when (state.panel) {
+                Panel.COLOR -> ColorPanel(state.color, vm)
+                Panel.LIGHT -> LightPanel(state.light, vm)
+                null -> Unit
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 BarButton("顔", state.intent is ViewIntent.FaceLock) { vm.show(ViewIntent.FaceLock()) }
                 for ((part, label) in PARTS) {
                     BarButton(label, (state.intent as? ViewIntent.Part)?.part == part) { vm.show(ViewIntent.Part(part)) }
                 }
                 BarButton("色", state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
+                BarButton("ライト", state.panel == Panel.LIGHT) { vm.toggle(Panel.LIGHT) }
             }
         }
     }
@@ -153,7 +186,7 @@ private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
         SliderRow("明るさ", "%+.1f EV".format(color.exposureEv), color.exposureEv, ColorAdjust.EV) { v ->
             vm.adjustColor { it.withExposure(v) }
         }
-        SliderRow("色温度", "${color.kelvin.roundToInt()}K", color.kelvin, ColorAdjust.KELVIN) { v ->
+        SliderRow("色温度", kelvinLabel(color.kelvin), color.kelvin, ColorAdjust.KELVIN) { v ->
             vm.adjustColor { it.withKelvin(v) }
         }
         Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
@@ -163,16 +196,36 @@ private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
 }
 
 @Composable
+private fun LightPanel(light: ScreenLight, vm: MirrorViewModel) {
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("点灯", Modifier.weight(1f))
+            Switch(light.on, { on -> vm.adjustLight { it.copy(on = on) } })
+        }
+        val percent = (light.brightness * 100).roundToInt()
+        SliderRow("明るさ", "$percent%", light.brightness, ScreenLight.BRIGHTNESS, enabled = light.on) { v ->
+            vm.adjustLight { it.copy(brightness = v) }
+        }
+        SliderRow("色温度", kelvinLabel(light.kelvin), light.kelvin, ScreenLight.KELVIN, enabled = light.on) { v ->
+            vm.adjustLight { it.copy(kelvin = v) }
+        }
+    }
+}
+
+private fun kelvinLabel(kelvin: Float) = "${(kelvin / 100f).roundToInt() * 100}K"
+
+@Composable
 private fun SliderRow(
     label: String,
     shown: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
+    enabled: Boolean = true,
     onChange: (Float) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.width(64.dp))
-        Slider(value, onChange, Modifier.weight(1f), valueRange = range)
+        Slider(value, onChange, Modifier.weight(1f), enabled = enabled, valueRange = range)
         Text(shown, Modifier.width(80.dp), textAlign = TextAlign.End)
     }
 }
