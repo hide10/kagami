@@ -7,8 +7,9 @@ import android.view.View
 import android.view.WindowManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -193,7 +193,7 @@ private fun Controls(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart)
                     BarButton(label) { onPart(part) }
                 }
                 BarButton("色", state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
-                BarButton("ライト", state.panel == Panel.LIGHT) { vm.toggle(Panel.LIGHT) }
+                BarButton("ライト", state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }) { vm.toggleLight() }
             }
         }
     }
@@ -217,15 +217,11 @@ private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
 @Composable
 private fun LightPanel(light: ScreenLight, vm: MirrorViewModel) {
     Column(Modifier.padding(horizontal = 16.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("点灯", Modifier.weight(1f))
-            Switch(light.on, { on -> vm.adjustLight { it.copy(on = on) } })
-        }
         val percent = (light.thicknessDp / ScreenLight.THICKNESS_DP.endInclusive * 100).roundToInt()
-        SliderRow("光の量", "$percent%", light.thicknessDp, ScreenLight.THICKNESS_DP, enabled = light.on) { v ->
+        SliderRow("光の量", "$percent%", light.thicknessDp, ScreenLight.THICKNESS_DP) { v ->
             vm.adjustLight { it.withThickness(v) }
         }
-        SliderRow("色温度", kelvinLabel(light.kelvin), light.kelvin, ScreenLight.KELVIN, enabled = light.on) { v ->
+        SliderRow("色温度", kelvinLabel(light.kelvin), light.kelvin, ScreenLight.KELVIN) { v ->
             vm.adjustLight { it.copy(kelvin = v) }
         }
     }
@@ -239,23 +235,23 @@ private fun SliderRow(
     shown: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
-    enabled: Boolean = true,
     onChange: (Float) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.width(64.dp))
-        Slider(value, onChange, Modifier.weight(1f), enabled = enabled, valueRange = range)
+        Slider(value, onChange, Modifier.weight(1f), valueRange = range)
         Text(shown, Modifier.width(80.dp), textAlign = TextAlign.End)
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BarButton(label: String, selected: Boolean = false, onClick: () -> Unit) {
+private fun BarButton(label: String, selected: Boolean = false, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     Box(
         Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
             .background(if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent)
-            .clickable(onClick = onClick)
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick)
             .padding(horizontal = 4.dp),
         Alignment.Center,
     ) { Text(label, color = Color.White, fontSize = 16.sp) }
