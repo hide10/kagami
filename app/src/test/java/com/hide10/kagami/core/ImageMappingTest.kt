@@ -34,6 +34,17 @@ class ImageMappingTest {
     }
 
     @Test
+    fun aLandmarkInAFrameTheCameraCroppedLandsWhereItIsInTheWholeView() {
+        // カメラが中央を 2 倍に切り出した一枚では、(100, 50) はビューの (960, 150) に描かれる。全体の中では中心から半分の距離にある。
+        val cropped = ImageMapping(image, PHONE, mirror = true, frame = Crop(540f, 960f, 2f))
+        assertPt(Pt(750f, 555f), cropped.toView(Pt(100f, 50f)))
+        // 左上へ 3 倍に寄った一枚なら、中心はその切り出しの中心へ、端は 1/3 の距離へ。
+        val corner = ImageMapping(image, PHONE, mirror = true, frame = Crop(180f, 320f, 3f))
+        assertPt(Pt(180f, 320f), corner.toView(Pt(240f, 320f)))
+        assertPt(Pt(180f + (960f - 540f) / 3, 320f + (150f - 960f) / 3), corner.toView(Pt(100f, 50f)))
+    }
+
+    @Test
     fun aSensorFrameTurnedAQuarterIsSeenUpright() {
         assertEquals(Size(480f, 640f), uprightSize(640, 480, 270))
         assertEquals(Size(480f, 640f), uprightSize(640, 480, 90))
