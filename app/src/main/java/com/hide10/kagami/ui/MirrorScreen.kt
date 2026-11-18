@@ -1,13 +1,13 @@
 package com.hide10.kagami.ui
 
 import android.app.Activity
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.view.View
 import android.view.WindowManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -41,13 +41,21 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidColorFilter
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,6 +79,17 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val faces = remember { FaceAnalyzer() }
     DisposableEffect(faces) { onDispose { faces.close() } }
+    val context = LocalContext.current
+    val preview = remember { PreviewView(context).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
+
+    // 止めた一枚。メモリにだけ置き、保存も共有もしない。カメラはつないだままなので、ライブへはすぐ戻れる。
+    var still by remember { mutableStateOf<ImageBitmap?>(null) }
+    fun goLive() {
+        still = null
+        vm.unfreeze()
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { goLive() }
+
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
@@ -84,17 +103,16 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             }
         }
 
-        CameraPreview(
-            color = state.color,
-            analyzer = faces,
-            modifier = Modifier.fillMaxSize().graphicsLayer {
-                val t = crop.layerTransform(size)
-                scaleX = t.scale
-                scaleY = t.scale
-                translationX = t.translationX
-                translationY = t.translationY
-            },
-        )
+        val zoomed = Modifier.fillMaxSize().graphicsLayer {
+            val t = crop.layerTransform(size)
+            scaleX = t.scale
+            scaleY = t.scale
+            translationX = t.translationX
+            translationY = t.translationY
+        }
+        CameraPreview(preview, state.color, faces, zoomed)
+        // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚。同じ切り出しと色をかければ止めた瞬間と同じに見える。
+        still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
         Box(
             Modifier.fillMaxSize()
                 .pointerInput(size) { detectTapGestures { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size)) } }
@@ -110,8 +128,20 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             state,
             vm,
             onPart = { part ->
-                vm.request(part)
-                faces.requestFace { face, image -> vm.faceFound(ImageMapping(image, size, mirror = true).toView(face), size) }
+                if (vm.request(part)) {
+                    faces.requestFace { face, image -> vm.faceFound(ImageMapping(image, size, mirror = true).toView(face), size) }
+                }
+            },
+            onFreeze = {
+                if (still != null) {
+                    goLive()
+                } else {
+                    preview.bitmap?.let {
+                        still = it.asImageBitmap()
+                        faces.cancel()
+                        vm.freeze()
+                    }
+                }
             },
             Modifier.align(Alignment.BottomCenter),
         )
@@ -144,10 +174,9 @@ private fun LightFrame(light: ScreenLight) {
 }
 
 @Composable
-private fun CameraPreview(color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, modifier: Modifier) {
+private fun CameraPreview(view: PreviewView, color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, modifier: Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
-    val view = remember { PreviewView(context).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
     var noCamera by remember { mutableStateOf(false) }
     LaunchedEffect(view, analyzer) {
         runFrontCamera(context, owner, view, analyzer)
@@ -162,12 +191,16 @@ private fun CameraPreview(color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, 
 
 /** graphicsLayer には色フィルタがなく、RenderEffect の色フィルタは API 31 からなので、View のレイヤーで色をかける。 */
 private fun PreviewView.tint(color: ColorAdjust) {
-    if (color.isNeutral) {
+    val filter = color.filter()
+    if (filter == null) {
         setLayerType(View.LAYER_TYPE_NONE, null)
     } else {
-        setLayerType(View.LAYER_TYPE_HARDWARE, Paint().apply { colorFilter = ColorMatrixColorFilter(color.matrix()) })
+        setLayerType(View.LAYER_TYPE_HARDWARE, Paint().apply { colorFilter = filter.asAndroidColorFilter() })
     }
 }
+
+/** プレビューにも止めた一枚にも同じものをかける。無加工なら null。 */
+private fun ColorAdjust.filter() = if (isNeutral) null else ColorFilter.colorMatrix(ColorMatrix(matrix()))
 
 private val PARTS = listOf(
     FacePart.LEFT_EYE to "左目",
@@ -177,7 +210,13 @@ private val PARTS = listOf(
 )
 
 @Composable
-private fun Controls(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) -> Unit, modifier: Modifier) {
+private fun Controls(
+    state: MirrorState,
+    vm: MirrorViewModel,
+    onPart: (FacePart) -> Unit,
+    onFreeze: () -> Unit,
+    modifier: Modifier,
+) {
     // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
     Surface(modifier.fillMaxWidth(), color = Color.Black.copy(alpha = 0.35f), contentColor = Color.White) {
         Column(Modifier.navigationBarsPadding().padding(vertical = 4.dp)) {
@@ -191,8 +230,9 @@ private fun Controls(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart)
                 val cell = Modifier.weight(1f)
                 BarButton("全体", cell) { vm.showAll() }
                 for ((part, label) in PARTS) {
-                    BarButton(label, cell) { onPart(part) }
+                    BarButton(label, cell, enabled = !state.frozen) { onPart(part) }
                 }
+                BarButton("静止", cell, state.frozen, onClick = onFreeze)
                 BarButton("色", cell, state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
                 BarButton("ライト", cell, state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }) { vm.toggleLight() }
             }
@@ -251,6 +291,7 @@ private fun BarButton(
     label: String,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
@@ -258,7 +299,7 @@ private fun BarButton(
         modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
             .background(if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent)
-            .combinedClickable(onLongClick = onLongClick, onClick = onClick),
+            .combinedClickable(enabled = enabled, onLongClick = onLongClick, onClick = onClick),
         Alignment.Center,
-    ) { Text(label, color = Color.White, fontSize = 14.sp) }
+    ) { Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.38f), fontSize = 14.sp) }
 }

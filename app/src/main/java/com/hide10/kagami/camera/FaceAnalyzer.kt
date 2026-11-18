@@ -31,6 +31,9 @@ class FaceAnalyzer : ImageAnalysis.Analyzer, AutoCloseable {
      */
     fun requestFace(onFace: (face: FaceLandmarks, image: Size) -> Unit) = request.set(onFace)
 
+    /** まだフレームに渡していない requestFace を取り消す。探し始めた顔は止められず、見つかれば onFace が呼ばれる。 */
+    fun cancel() = request.set(null)
+
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(proxy: ImageProxy) {
         val media = proxy.image ?: return proxy.close()
