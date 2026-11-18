@@ -14,14 +14,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -49,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -63,6 +65,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -103,6 +106,7 @@ import com.hide10.kagami.core.SensorMapping
 import com.hide10.kagami.core.SensorRect
 import com.hide10.kagami.core.SensorSpec
 import com.hide10.kagami.core.Size
+import com.hide10.kagami.core.ZoomStrip
 import kotlin.math.roundToInt
 
 @Composable
@@ -125,6 +129,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { goLive() }
 
+    val haptics = LocalHapticFeedback.current
     val light = state.light
     if (light.on) FullBrightness()
     val cardScale by animateFloatAsState(light.previewScale, label = "card")
@@ -170,6 +175,17 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             translationX = t.translationX
             translationY = t.translationY
         }
+        fun toggleFreeze() {
+            if (still != null) {
+                goLive()
+            } else {
+                preview.bitmap?.let {
+                    still = it.asImageBitmap()
+                    faces.cancel()
+                    vm.freeze(frame.applied, size)
+                }
+            }
+        }
         // 縮小のライトでは、この入れ物ごと角の丸いカードに縮めて周りを光らせる。graphicsLayer はレイアウトの大きさを変えず、
         // 中の指の座標も縮める前のこの入れ物の座標で届くので、切り出しとジェスチャーの計算はそのまま使える。
         Box(
@@ -188,7 +204,15 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
             Box(
                 Modifier.fillMaxSize()
-                    .pointerInput(size) { detectTapGestures { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size, vm.state.value.extent(size))) } }
+                    .pointerInput(size) {
+                        // 指がタッチスロップを越えて動くと次の detectTransformGestures がその動きを消費し、長押しは取り消される。
+                        detectTapGestures(
+                            onLongPress = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                toggleFreeze()
+                            },
+                        ) { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size, vm.state.value.extent(size))) }
+                    }
                     .pointerInput(size) {
                         detectTransformGestures { centroid, pan, zoom, _ ->
                             crop = CropPlanner.transform(crop, Pt(centroid.x, centroid.y), Pt(pan.x, pan.y), zoom, size, vm.state.value.extent(size))
@@ -199,22 +223,18 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         }
         if (light.glows(LightMode.BAND)) LightBand(light, glow)
         Column(Modifier.fillMaxSize()) {
-            FunctionRow(
-                state,
-                vm,
-                onFreeze = {
-                    if (still != null) {
-                        goLive()
-                    } else {
-                        preview.bitmap?.let {
-                            still = it.asImageBitmap()
-                            faces.cancel()
-                            vm.freeze(frame.applied, size)
-                        }
-                    }
-                },
-            )
-            Spacer(Modifier.weight(1f))
+            FunctionRow(state, vm, onFreeze = ::toggleFreeze)
+            // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。
+            Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
+                ZoomTrack(
+                    zoom = { crop.zoom },
+                    onDrag = { dy, length ->
+                        crop = ZoomStrip.drag(crop, dy, length, size, vm.state.value.extent(size))
+                        vm.moveTo(crop)
+                    },
+                    Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(40.dp),
+                )
+            }
             PartBar(state, vm) { part ->
                 if (vm.request(part)) {
                     val press = ++presses
@@ -235,6 +255,39 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
 }
 
 private val CARD = RoundedCornerShape(24.dp)
+
+/** 帯の両端の余白。つまみが端で欠けないだけ空ける。 */
+private val TRACK_INSET = 12.dp
+
+/**
+ * 右端の寄り引きの帯。上下になぞると寄り引きし、細い線の上のつまみが今の倍率を対数で示す。
+ * 帯で始まった指はここで受け止めるので、プレビューを動かしもタップで寄りもしない。
+ */
+@Composable
+private fun ZoomTrack(zoom: () -> Float, onDrag: (dy: Float, length: Float) -> Unit, modifier: Modifier) {
+    val drag by rememberUpdatedState(onDrag)
+    Box(
+        modifier
+            .semantics { contentDescription = "上下になぞって拡大・縮小" }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { change, dy ->
+                    change.consume()
+                    drag(dy, size.height - 2 * TRACK_INSET.toPx())
+                }
+            }
+            .drawBehind {
+                val x = size.width / 2
+                val top = TRACK_INSET.toPx()
+                val bottom = size.height - top
+                // 暗い縁取りの上に明るい線を引くので、プレビューの上でも光った周りの上でも見える。
+                drawLine(Color.Black.copy(alpha = 0.3f), Offset(x, top), Offset(x, bottom), 4.dp.toPx(), StrokeCap.Round)
+                drawLine(Color.White.copy(alpha = 0.5f), Offset(x, top), Offset(x, bottom), 2.dp.toPx(), StrokeCap.Round)
+                val thumb = Offset(x, bottom - ZoomStrip.thumb(zoom()) * (bottom - top))
+                drawCircle(Color.Black.copy(alpha = 0.4f), 7.dp.toPx(), thumb)
+                drawCircle(Color.White.copy(alpha = 0.9f), 5.5.dp.toPx(), thumb)
+            },
+    )
+}
 
 /** ライトが点いているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。光らせ方を変えても続く。 */
 @Composable
