@@ -38,11 +38,24 @@ data class LayerTransform(val scale: Float, val translationX: Float, val transla
 data class Crop(val cx: Float, val cy: Float, val zoom: Float) {
     val center get() = Pt(cx, cy)
 
-    fun clamp(size: Size): Crop {
-        val z = zoom.coerceIn(1f, MAX_ZOOM)
-        val halfW = size.w / (2 * z)
-        val halfH = size.h / (2 * z)
-        return Crop(cx.coerceIn(halfW, size.w - halfW), cy.coerceIn(halfH, size.h - halfH), z)
+    /**
+     * 表示領域を bounds の表示領域の内側に収める。既定の bounds は画像全体。倍率は bounds.zoom から MAX_ZOOM まで。
+     * bounds 自身は clamp 済みであること。
+     */
+    fun clamp(size: Size, bounds: Crop = full(size)): Crop {
+        val z = zoom.coerceIn(bounds.zoom, MAX_ZOOM)
+        val slackW = size.w / (2 * bounds.zoom) - size.w / (2 * z)
+        val slackH = size.h / (2 * bounds.zoom) - size.h / (2 * z)
+        return Crop(cx.coerceIn(bounds.cx - slackW, bounds.cx + slackW), cy.coerceIn(bounds.cy - slackH, bounds.cy + slackH), z)
+    }
+
+    /**
+     * カメラがすでに frame へ切り出した映像の上で、この切り出しを見せるための残りの拡大。どちらもこのビューの座標。
+     * カメラの映像は p を pivot + frame.zoom*(p - frame.center) に描くので、それに重ねて同じ見え方になる Crop を返す。frame と同じなら全体(恒等)。
+     */
+    fun within(frame: Crop, size: Size): Crop {
+        val mid = size.center
+        return Crop(mid.x + frame.zoom * (cx - frame.cx), mid.y + frame.zoom * (cy - frame.cy), zoom / frame.zoom)
     }
 
     /** 元座標 c を画面中心へ運ぶ: screen = pivot + zoom*(p - pivot) + t で t = zoom*(center - c)。 */

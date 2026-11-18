@@ -1,6 +1,7 @@
 package com.hide10.kagami.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
@@ -47,6 +48,49 @@ class CropTest {
             val tap = Pt(rnd.nextFloat() * PHONE.w, rnd.nextFloat() * PHONE.h)
             assertPt(tap, screenOf(crop.toSource(tap, PHONE), crop, PHONE), eps = 0.05f)
         }
+    }
+
+    @Test
+    fun clampInsideAFrameKeepsTheCropWithinThatFrame() {
+        val frame = Crop(300f, 700f, 2.5f)
+        repeat(2000) {
+            val c = randomCrop().clamp(PHONE, frame)
+            assertTrue("$c zoom", c.zoom in frame.zoom..Crop.MAX_ZOOM)
+            for (corner in listOf(Pt(0f, 0f), Pt(PHONE.w, PHONE.h))) {
+                val onFrame = screenOf(c.toSource(corner, PHONE), frame, PHONE)
+                assertTrue("$c leaves $frame at $corner -> $onFrame", onFrame.x in -0.01f..PHONE.w + 0.01f && onFrame.y in -0.01f..PHONE.h + 0.01f)
+            }
+        }
+        assertEquals(frame, Crop.full(PHONE).clamp(PHONE, frame))
+    }
+
+    /** カメラが frame に切り出した映像へ、残りの拡大 residual を重ねたときに画面のどこへ描かれるか。 */
+    private fun throughCamera(p: Pt, frame: Crop, residual: Crop) = screenOf(screenOf(p, frame, PHONE), residual, PHONE)
+
+    @Test
+    fun theCameraCropPlusTheRemainderLooksLikeTheShownCrop() {
+        repeat(500) {
+            val shown = randomCrop().clamp(PHONE)
+            val frame = Crop(shown.cx, shown.cy, 1f + rnd.nextFloat() * (shown.zoom - 1f)).clamp(PHONE)
+            val p = Pt(rnd.nextFloat() * PHONE.w, rnd.nextFloat() * PHONE.h)
+            assertPt(screenOf(p, shown, PHONE), throughCamera(p, frame, shown.within(frame, PHONE)), eps = 0.05f)
+        }
+    }
+
+    @Test
+    fun nothingIsLeftForTheAppWhenTheCameraCroppedExactlyTheShownCrop() {
+        val shown = Crop(300f, 700f, 6f)
+        val rest = shown.within(shown, PHONE)
+        assertPt(PHONE.center, rest.center, eps = 1e-3f)
+        assertEquals(1f, rest.zoom, 1e-6f)
+    }
+
+    @Test
+    fun aCameraThatDidNotCropLeavesTheWholeZoomToTheApp() {
+        val shown = Crop(300f, 700f, 6f)
+        val rest = shown.within(Crop.full(PHONE), PHONE)
+        assertPt(shown.center, rest.center, eps = 1e-3f)
+        assertEquals(shown.zoom, rest.zoom, 1e-6f)
     }
 
     @Test
