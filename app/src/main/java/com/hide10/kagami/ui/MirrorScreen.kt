@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.systemGestures
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -65,6 +67,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
@@ -79,6 +82,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -227,15 +233,16 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         if (light.glows(LightMode.BAND)) LightBand(light, glow)
         Column(Modifier.fillMaxSize()) {
             FunctionRow(state, vm, helping = help, onFreeze = ::toggleFreeze, onHelp = { help = true })
-            // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。
-            Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
+            // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。戻るジェスチャーの幅だけ内側へ寄せる。
+            val edge = WindowInsets.safeDrawing.union(WindowInsets.systemGestures).only(WindowInsetsSides.Horizontal)
+            Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(edge)) {
                 ZoomTrack(
                     zoom = { crop.zoom },
                     onDrag = { dy, length ->
                         crop = ZoomStrip.drag(crop, dy, length, size, vm.state.value.extent(size))
                         vm.moveTo(crop)
                     },
-                    Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(40.dp),
+                    Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(TRACK_WIDTH),
                 )
             }
             PartBar(state, vm) { part ->
@@ -259,16 +266,26 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
 
 private val CARD = RoundedCornerShape(24.dp)
 
+/** 帯の幅で、指で押せる範囲。48dp より広くとる。 */
+private val TRACK_WIDTH = 56.dp
+
+private val THUMB_RADIUS = 18.dp
+
 /** 帯の両端の余白。つまみが端で欠けないだけ空ける。 */
-private val TRACK_INSET = 12.dp
+private val TRACK_INSET = THUMB_RADIUS + 2.dp
+
+/** つまみの「+」と縁取り。光っている周りの上でも白いつまみの形が見える濃さ。 */
+private val THUMB_INK = Color(0xFF424242)
 
 /**
- * 右端の寄り引きの帯。上下になぞると寄り引きし、細い線の上のつまみが今の倍率を対数で示す。
+ * 右端の寄り引きのスライダー。細い線の上の「+」のつまみが今の倍率を対数で示し、寄っているあいだは横に倍率を出す。
+ * つまみを掴んでも帯のどこをなぞっても、指が動いた分だけ寄り引きするので、つまみは指についてくる。
  * 帯で始まった指はここで受け止めるので、プレビューを動かしもタップで寄りもしない。
  */
 @Composable
 private fun ZoomTrack(zoom: () -> Float, onDrag: (dy: Float, length: Float) -> Unit, modifier: Modifier) {
     val drag by rememberUpdatedState(onDrag)
+    val text = rememberTextMeasurer()
     Box(
         modifier
             .semantics { contentDescription = "上下になぞって拡大・縮小" }
@@ -285,12 +302,30 @@ private fun ZoomTrack(zoom: () -> Float, onDrag: (dy: Float, length: Float) -> U
                 // 暗い縁取りの上に明るい線を引くので、プレビューの上でも光った周りの上でも見える。
                 drawLine(Color.Black.copy(alpha = 0.3f), Offset(x, top), Offset(x, bottom), 4.dp.toPx(), StrokeCap.Round)
                 drawLine(Color.White.copy(alpha = 0.5f), Offset(x, top), Offset(x, bottom), 2.dp.toPx(), StrokeCap.Round)
-                val thumb = Offset(x, bottom - ZoomStrip.thumb(zoom()) * (bottom - top))
-                drawCircle(Color.Black.copy(alpha = 0.4f), 7.dp.toPx(), thumb)
-                drawCircle(Color.White.copy(alpha = 0.9f), 5.5.dp.toPx(), thumb)
+                val z = zoom()
+                val thumb = Offset(x, bottom - ZoomStrip.thumb(z) * (bottom - top))
+                val r = THUMB_RADIUS.toPx()
+                drawCircle(THUMB_INK.copy(alpha = 0.5f), r + 1.5.dp.toPx(), thumb)
+                drawCircle(Color.White.copy(alpha = 0.92f), r, thumb)
+                val arm = Offset(r * 0.45f, 0f)
+                val stroke = 2.5.dp.toPx()
+                drawLine(THUMB_INK, thumb - arm, thumb + arm, stroke, StrokeCap.Round)
+                drawLine(THUMB_INK, thumb - Offset(0f, arm.x), thumb + Offset(0f, arm.x), stroke, StrokeCap.Round)
+                ZoomStrip.label(z)?.let {
+                    val label = text.measure(it, ZOOM_LABEL)
+                    val at = Offset(x - r - 6.dp.toPx() - label.size.width, thumb.y - label.size.height / 2f)
+                    drawText(label, topLeft = at)
+                }
             },
     )
 }
+
+/** 倍率の文字。プレビューの明るいところでも読めるよう、薄い影をつける。 */
+private val ZOOM_LABEL = TextStyle(
+    color = Color.White.copy(alpha = 0.85f),
+    fontSize = 12.sp,
+    shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 4f),
+)
 
 /** ライトが点いているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。光らせ方を変えても続く。 */
 @Composable

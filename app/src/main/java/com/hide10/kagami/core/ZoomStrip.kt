@@ -3,6 +3,7 @@ package com.hide10.kagami.core
 import com.hide10.kagami.core.Crop.Companion.MAX_ZOOM
 import kotlin.math.ln
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 /**
  * 画面の右端を上下になぞって寄り引きする帯。上へなぞると寄り、下へなぞると引く。
@@ -15,4 +16,10 @@ object ZoomStrip {
 
     /** zoom 倍を示すつまみの位置。0 が下端(1 倍)、1 が上端(MAX_ZOOM 倍)で、なぞった指と同じだけ動く。 */
     fun thumb(zoom: Float): Float = (ln(zoom) / ln(MAX_ZOOM)).coerceIn(0f, 1f)
+
+    /** つまみの横に出す倍率。0.1 倍刻みで、全体を映しているあいだは出さない。端末の言語によらず小数点で書く。 */
+    fun label(zoom: Float): String? {
+        val tenths = (zoom * 10).roundToInt()
+        return if (tenths <= 10) null else "×${tenths / 10}.${tenths % 10}"
+    }
 }

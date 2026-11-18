@@ -1,6 +1,7 @@
 package com.hide10.kagami.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.pow
@@ -61,6 +62,15 @@ class ZoomStripTest {
         assertEquals(0f, ZoomStrip.thumb(1f), 1e-6f)
         assertEquals(0.5f, ZoomStrip.thumb(10f.pow(0.5f)), 1e-6f)
         assertEquals(1f, ZoomStrip.thumb(10f), 1e-6f)
+    }
+
+    @Test
+    fun theLabelShowsTheZoomToATenthAndHidesOnTheWholeView() {
+        assertNull(ZoomStrip.label(1f))
+        assertNull(ZoomStrip.label(1.04f))
+        assertEquals("×1.1", ZoomStrip.label(1.1f))
+        assertEquals("×3.0", ZoomStrip.label(2.96f))
+        assertEquals("×10.0", ZoomStrip.label(10f))
     }
 
     @Test
