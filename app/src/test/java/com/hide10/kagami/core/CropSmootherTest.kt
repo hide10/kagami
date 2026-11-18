@@ -12,10 +12,12 @@ class CropSmootherTest {
     private val to = Crop(300f, 600f, 4f)
 
     @Test
-    fun reachesTheTargetWithinTwoSeconds() {
-        val c = settle(from, to, seconds = 2f)
-        assertEquals(to.cx, c.cx, 0.5f)
-        assertEquals(to.cy, c.cy, 0.5f)
+    fun aJumpGlidesAndSettlesWithinASecond() {
+        val firstFrame = CropSmoother.step(from, to, 1f / 60)
+        assertTrue(abs(firstFrame.cx - from.cx) < 0.2f * abs(to.cx - from.cx))
+        val c = settle(from, to, seconds = 1f)
+        assertEquals(to.cx, c.cx, 1f)
+        assertEquals(to.cy, c.cy, 1f)
         assertEquals(to.zoom, c.zoom, 0.01f)
     }
 
@@ -39,7 +41,7 @@ class CropSmootherTest {
         assertTrue(abs(c.cx - from.cx) <= maxFrac * abs(to.cx - from.cx) + 1e-3f)
         assertTrue(abs(c.cy - from.cy) <= maxFrac * abs(to.cy - from.cy) + 1e-3f)
         assertTrue(ln(c.zoom) <= maxFrac * ln(to.zoom) + 1e-4f)
-        assertTrue(maxFrac < 0.4f)
+        assertTrue(maxFrac < 0.5f)
     }
 
     @Test

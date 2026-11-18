@@ -57,7 +57,6 @@ import com.hide10.kagami.core.ColorAdjust
 import com.hide10.kagami.core.Crop
 import com.hide10.kagami.core.CropPlanner
 import com.hide10.kagami.core.CropSmoother
-import com.hide10.kagami.core.FaceHold
 import com.hide10.kagami.core.FaceLandmarks
 import com.hide10.kagami.core.FacePart
 import com.hide10.kagami.core.ImageMapping
@@ -66,28 +65,27 @@ import com.hide10.kagami.core.Panel
 import com.hide10.kagami.core.Pt
 import com.hide10.kagami.core.ScreenLight
 import com.hide10.kagami.core.Size
-import com.hide10.kagami.core.ViewIntent
 import kotlin.math.roundToInt
 
 @Composable
 fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val hold = remember { FaceHold() }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
         LaunchedEffect(size) {
+            // 切り出しはこの大きさのビュー座標なので、大きさが変わったら全体から始める。
+            vm.showAll()
             var last = withFrameNanos { it }
             while (true) withFrameNanos { now ->
-                val target = CropPlanner.target(vm.state.value.intent, hold.get(now), size)
-                crop = CropSmoother.step(crop, target, (now - last) / 1e9f)
+                crop = CropSmoother.step(crop, vm.state.value.target ?: Crop.full(size), (now - last) / 1e9f)
                 last = now
             }
         }
 
         CameraPreview(
             color = state.color,
-            onFace = { face, image -> hold.seen(ImageMapping(image, size, mirror = true).toView(face), System.nanoTime()) },
+            onFace = { face, image -> vm.faceFound(ImageMapping(image, size, mirror = true).toView(face), size) },
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 val t = crop.layerTransform(size)
                 scaleX = t.scale
@@ -98,10 +96,11 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         )
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(size) { detectTapGestures { vm.show(CropPlanner.tap(Pt(it.x, it.y), crop, size)) } }
+                .pointerInput(size) { detectTapGestures { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size)) } }
                 .pointerInput(size) {
-                    detectTransformGestures { _, _, zoom, _ ->
-                        if (zoom != 1f) vm.pinch(zoom, hold.get(System.nanoTime()), crop, size)
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        crop = CropPlanner.transform(crop, Pt(centroid.x, centroid.y), Pt(pan.x, pan.y), zoom, size)
+                        vm.moveTo(crop)
                     }
                 },
         )
@@ -180,9 +179,9 @@ private fun Controls(state: MirrorState, vm: MirrorViewModel, modifier: Modifier
                 null -> Unit
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                BarButton("顔", state.intent is ViewIntent.FaceLock) { vm.show(ViewIntent.FaceLock()) }
+                BarButton("全体") { vm.showAll() }
                 for ((part, label) in PARTS) {
-                    BarButton(label, (state.intent as? ViewIntent.Part)?.part == part) { vm.show(ViewIntent.Part(part)) }
+                    BarButton(label) { vm.request(part) }
                 }
                 BarButton("色", state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
                 BarButton("ライト", state.panel == Panel.LIGHT) { vm.toggle(Panel.LIGHT) }
@@ -201,7 +200,7 @@ private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
             vm.adjustColor { it.withKelvin(v) }
         }
         Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
-            BarButton("元に戻す", selected = false) { vm.adjustColor { ColorAdjust() } }
+            BarButton("元に戻す") { vm.adjustColor { ColorAdjust() } }
         }
     }
 }
@@ -242,7 +241,7 @@ private fun SliderRow(
 }
 
 @Composable
-private fun BarButton(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun BarButton(label: String, selected: Boolean = false, onClick: () -> Unit) {
     Box(
         Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
