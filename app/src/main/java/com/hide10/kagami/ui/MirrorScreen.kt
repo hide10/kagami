@@ -6,6 +6,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -32,7 +33,11 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -88,6 +94,7 @@ import com.hide10.kagami.core.CropPlanner
 import com.hide10.kagami.core.CropSmoother
 import com.hide10.kagami.core.FacePart
 import com.hide10.kagami.core.ImageMapping
+import com.hide10.kagami.core.LightMode
 import com.hide10.kagami.core.MirrorState
 import com.hide10.kagami.core.Panel
 import com.hide10.kagami.core.Pt
@@ -118,7 +125,11 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { goLive() }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+    val light = state.light
+    if (light.on) FullBrightness()
+    val cardScale by animateFloatAsState(light.previewScale, label = "card")
+    val glow = light.color().let { Color(it.r, it.g, it.b) }
+    BoxWithConstraints(Modifier.fillMaxSize().background(if (light.glows(LightMode.SHRINK)) glow else Color.Black)) {
         val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         // crop は見せている切り出しで、唯一の正。カメラはその上限までを切り出し、layer は実際に切り出された一枚に残りの拡大をかける。
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
@@ -159,21 +170,34 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             translationX = t.translationX
             translationY = t.translationY
         }
-        CameraPreview(preview, state.color, faces, camera, zoomed)
-        // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚で、カメラが切り出した範囲だけが写っている。
-        // その範囲を still として覚え、残りの拡大と色をかければ止めた瞬間と同じに見える。
-        still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
+        // 縮小のライトでは、この入れ物ごと角の丸いカードに縮めて周りを光らせる。graphicsLayer はレイアウトの大きさを変えず、
+        // 中の指の座標も縮める前のこの入れ物の座標で届くので、切り出しとジェスチャーの計算はそのまま使える。
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(size) { detectTapGestures { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size, vm.state.value.extent(size))) } }
-                .pointerInput(size) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        crop = CropPlanner.transform(crop, Pt(centroid.x, centroid.y), Pt(pan.x, pan.y), zoom, size, vm.state.value.extent(size))
-                        vm.moveTo(crop)
-                    }
-                },
-        )
-        if (state.light.on) LightFrame(state.light)
+                .graphicsLayer {
+                    scaleX = cardScale
+                    scaleY = cardScale
+                    shape = if (cardScale < 1f) CARD else RectangleShape
+                    clip = true
+                }
+                .background(Color.Black),
+        ) {
+            CameraPreview(preview, state.color, faces, camera, zoomed)
+            // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚で、カメラが切り出した範囲だけが写っている。
+            // その範囲を still として覚え、残りの拡大と色をかければ止めた瞬間と同じに見える。
+            still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
+            Box(
+                Modifier.fillMaxSize()
+                    .pointerInput(size) { detectTapGestures { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size, vm.state.value.extent(size))) } }
+                    .pointerInput(size) {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            crop = CropPlanner.transform(crop, Pt(centroid.x, centroid.y), Pt(pan.x, pan.y), zoom, size, vm.state.value.extent(size))
+                            vm.moveTo(crop)
+                        }
+                    },
+            )
+        }
+        if (light.glows(LightMode.BAND)) LightBand(light, glow)
         Column(Modifier.fillMaxSize()) {
             FunctionRow(
                 state,
@@ -210,9 +234,11 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     }
 }
 
-/** 画面のふちを光らせて顔を照らす。帯は外側が塗りつぶしで、内側へ向かって帯の太さちょうどで消える。出ているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。 */
+private val CARD = RoundedCornerShape(24.dp)
+
+/** ライトが点いているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。光らせ方を変えても続く。 */
 @Composable
-private fun LightFrame(light: ScreenLight) {
+private fun FullBrightness() {
     val window = (LocalContext.current as Activity).window
     DisposableEffect(window) {
         window.attributes = window.attributes.apply { screenBrightness = 1f }
@@ -220,8 +246,12 @@ private fun LightFrame(light: ScreenLight) {
             window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
         }
     }
-    val c = light.color()
-    val fade = listOf(Color(c.r, c.g, c.b), Color(c.r, c.g, c.b, alpha = 0f))
+}
+
+/** 画面のふちを光らせて顔を照らす。帯は外側が塗りつぶしで、内側へ向かって帯の太さちょうどで消える。 */
+@Composable
+private fun LightBand(light: ScreenLight, glow: Color) {
+    val fade = listOf(glow, glow.copy(alpha = 0f))
     Box(
         Modifier.fillMaxSize().drawBehind {
             val t = light.thicknessDp.dp.toPx()
@@ -369,6 +399,18 @@ private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
 @Composable
 private fun LightPanel(light: ScreenLight, vm: MirrorViewModel) {
     Column(Modifier.padding(horizontal = 16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("光り方", Modifier.width(64.dp))
+            SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+                LIGHT_MODES.forEachIndexed { i, (mode, name) ->
+                    SegmentedButton(
+                        selected = light.mode == mode,
+                        onClick = { vm.adjustLight { it.copy(mode = mode) } },
+                        shape = SegmentedButtonDefaults.itemShape(i, LIGHT_MODES.size),
+                    ) { Text(name) }
+                }
+            }
+        }
         val percent = (light.thicknessDp / ScreenLight.THICKNESS_DP.endInclusive * 100).roundToInt()
         SliderRow("光の量", "$percent%", light.thicknessDp, ScreenLight.THICKNESS_DP) { v ->
             vm.adjustLight { it.withThickness(v) }
@@ -378,6 +420,8 @@ private fun LightPanel(light: ScreenLight, vm: MirrorViewModel) {
         }
     }
 }
+
+private val LIGHT_MODES = listOf(LightMode.BAND to "縁", LightMode.SHRINK to "縮小")
 
 private fun kelvinLabel(kelvin: Float) = "${(kelvin / 100f).roundToInt() * 100}K"
 
