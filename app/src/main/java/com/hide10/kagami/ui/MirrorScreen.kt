@@ -1,5 +1,8 @@
 package com.hide10.kagami.ui
 
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
+import android.view.View
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,13 +11,17 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -38,6 +46,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hide10.kagami.camera.runFrontCamera
+import com.hide10.kagami.core.ColorAdjust
 import com.hide10.kagami.core.Crop
 import com.hide10.kagami.core.CropPlanner
 import com.hide10.kagami.core.CropSmoother
@@ -46,9 +55,11 @@ import com.hide10.kagami.core.FaceLandmarks
 import com.hide10.kagami.core.FacePart
 import com.hide10.kagami.core.ImageMapping
 import com.hide10.kagami.core.MirrorState
+import com.hide10.kagami.core.Panel
 import com.hide10.kagami.core.Pt
 import com.hide10.kagami.core.Size
 import com.hide10.kagami.core.ViewIntent
+import kotlin.math.roundToInt
 
 @Composable
 fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
@@ -67,6 +78,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         }
 
         CameraPreview(
+            color = state.color,
             onFace = { face, image -> hold.seen(ImageMapping(image, size, mirror = true).toView(face), System.nanoTime()) },
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 val t = crop.layerTransform(size)
@@ -90,7 +102,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
 }
 
 @Composable
-private fun CameraPreview(onFace: (FaceLandmarks, Size) -> Unit, modifier: Modifier) {
+private fun CameraPreview(color: ColorAdjust, onFace: (FaceLandmarks, Size) -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val view = remember { PreviewView(context).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
@@ -103,7 +115,16 @@ private fun CameraPreview(onFace: (FaceLandmarks, Size) -> Unit, modifier: Modif
     if (noCamera) {
         Box(modifier, Alignment.Center) { Text("前面カメラが見つかりません", color = Color.White) }
     } else {
-        AndroidView({ view }, modifier)
+        AndroidView({ view }, modifier) { it.tint(color) }
+    }
+}
+
+/** graphicsLayer には色フィルタがなく、RenderEffect の色フィルタは API 31 からなので、View のレイヤーで色をかける。 */
+private fun PreviewView.tint(color: ColorAdjust) {
+    if (color.isNeutral) {
+        setLayerType(View.LAYER_TYPE_NONE, null)
+    } else {
+        setLayerType(View.LAYER_TYPE_HARDWARE, Paint().apply { colorFilter = ColorMatrixColorFilter(color.matrix()) })
     }
 }
 
@@ -111,14 +132,48 @@ private val PARTS = listOf(FacePart.EYES to "目", FacePart.NOSE to "鼻", FaceP
 
 @Composable
 private fun Controls(state: MirrorState, vm: MirrorViewModel, modifier: Modifier) {
-    Row(
-        modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.35f)).navigationBarsPadding().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        BarButton("顔", state.intent is ViewIntent.FaceLock) { vm.show(ViewIntent.FaceLock()) }
-        for ((part, label) in PARTS) {
-            BarButton(label, (state.intent as? ViewIntent.Part)?.part == part) { vm.show(ViewIntent.Part(part)) }
+    // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
+    Surface(modifier.fillMaxWidth(), color = Color.Black.copy(alpha = 0.35f), contentColor = Color.White) {
+        Column(Modifier.navigationBarsPadding().padding(vertical = 4.dp)) {
+            if (state.panel == Panel.COLOR) ColorPanel(state.color, vm)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                BarButton("顔", state.intent is ViewIntent.FaceLock) { vm.show(ViewIntent.FaceLock()) }
+                for ((part, label) in PARTS) {
+                    BarButton(label, (state.intent as? ViewIntent.Part)?.part == part) { vm.show(ViewIntent.Part(part)) }
+                }
+                BarButton("色", state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
+            }
         }
+    }
+}
+
+@Composable
+private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        SliderRow("明るさ", "%+.1f EV".format(color.exposureEv), color.exposureEv, ColorAdjust.EV) { v ->
+            vm.adjustColor { it.withExposure(v) }
+        }
+        SliderRow("色温度", "${color.kelvin.roundToInt()}K", color.kelvin, ColorAdjust.KELVIN) { v ->
+            vm.adjustColor { it.withKelvin(v) }
+        }
+        Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
+            BarButton("元に戻す", selected = false) { vm.adjustColor { ColorAdjust() } }
+        }
+    }
+}
+
+@Composable
+private fun SliderRow(
+    label: String,
+    shown: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Float) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.width(64.dp))
+        Slider(value, onChange, Modifier.weight(1f), valueRange = range)
+        Text(shown, Modifier.width(80.dp), textAlign = TextAlign.End)
     }
 }
 

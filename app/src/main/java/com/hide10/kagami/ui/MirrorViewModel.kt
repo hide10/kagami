@@ -1,10 +1,12 @@
 package com.hide10.kagami.ui
 
 import androidx.lifecycle.ViewModel
+import com.hide10.kagami.core.ColorAdjust
 import com.hide10.kagami.core.Crop
 import com.hide10.kagami.core.CropPlanner
 import com.hide10.kagami.core.FaceLandmarks
 import com.hide10.kagami.core.MirrorState
+import com.hide10.kagami.core.Panel
 import com.hide10.kagami.core.Size
 import com.hide10.kagami.core.ViewIntent
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,4 +22,8 @@ class MirrorViewModel : ViewModel() {
 
     fun pinch(factor: Float, face: FaceLandmarks?, shown: Crop, size: Size) =
         _state.update { it.copy(intent = CropPlanner.pinch(it.intent, factor, face, shown, size)) }
+
+    fun toggle(panel: Panel) = _state.update { it.toggle(panel) }
+
+    fun adjustColor(change: (ColorAdjust) -> ColorAdjust) = _state.update { it.copy(color = change(it.color)) }
 }
