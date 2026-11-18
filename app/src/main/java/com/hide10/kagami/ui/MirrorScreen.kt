@@ -6,26 +6,37 @@ import android.view.View
 import android.view.WindowManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -47,10 +59,17 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -155,10 +174,24 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                 },
         )
         if (state.light.on) LightFrame(state.light)
-        Controls(
-            state,
-            vm,
-            onPart = { part ->
+        Column(Modifier.fillMaxSize()) {
+            FunctionRow(
+                state,
+                vm,
+                onFreeze = {
+                    if (still != null) {
+                        goLive()
+                    } else {
+                        preview.bitmap?.let {
+                            still = it.asImageBitmap()
+                            faces.cancel()
+                            vm.freeze(frame.applied, size)
+                        }
+                    }
+                },
+            )
+            Spacer(Modifier.weight(1f))
+            PartBar(state, vm) { part ->
                 if (vm.request(part)) {
                     val press = ++presses
                     val mapping = frame.mapping
@@ -172,20 +205,8 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                         }
                     }
                 }
-            },
-            onFreeze = {
-                if (still != null) {
-                    goLive()
-                } else {
-                    preview.bitmap?.let {
-                        still = it.asImageBitmap()
-                        faces.cancel()
-                        vm.freeze(frame.applied, size)
-                    }
-                }
-            },
-            Modifier.align(Alignment.BottomCenter),
-        )
+            }
+        }
     }
 }
 
@@ -278,32 +299,51 @@ private val PARTS = listOf(
     FacePart.MOUTH to "口",
 )
 
+/** アイコンの下に敷く暗い下地。光っている画面の上でも白いアイコンが読める濃さ。 */
+private val SCRIM = Color.Black.copy(alpha = 0.55f)
+
+/** 機能のアイコン。ステータスバーと切り欠きの下に、右へ寄せて並べる。 */
 @Composable
-private fun Controls(
-    state: MirrorState,
-    vm: MirrorViewModel,
-    onPart: (FacePart) -> Unit,
-    onFreeze: () -> Unit,
-    modifier: Modifier,
-) {
-    // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
-    Surface(modifier.fillMaxWidth(), color = Color.Black.copy(alpha = 0.35f), contentColor = Color.White) {
+private fun FunctionRow(state: MirrorState, vm: MirrorViewModel, onFreeze: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .padding(8.dp),
+        Arrangement.End,
+    ) {
+        // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
+        Surface(shape = CircleShape, color = SCRIM, contentColor = Color.White) {
+            Row {
+                GlyphButton("ライト", selected = state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }, onClick = vm::toggleLight) {
+                    bulbGlyph(state.light.on)
+                }
+                GlyphButton("静止", selected = state.frozen, onClick = onFreeze) { pauseGlyph(state.frozen) }
+                val coloring = state.panel == Panel.COLOR
+                GlyphButton("色・明るさ", selected = coloring, onClick = { vm.toggle(Panel.COLOR) }) { slidersGlyph(coloring) }
+            }
+        }
+    }
+}
+
+/** 部位のアイコンと、その上に開くパネル。 */
+@Composable
+private fun PartBar(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) -> Unit) {
+    Surface(Modifier.fillMaxWidth(), color = SCRIM, contentColor = Color.White) {
         Column(Modifier.navigationBarsPadding().padding(vertical = 4.dp)) {
             when (state.panel) {
                 Panel.COLOR -> ColorPanel(state.color, vm)
                 Panel.LIGHT -> LightPanel(state.light, vm)
                 null -> Unit
             }
-            // 幅を等分する。360dp で 8 個なら 1 個 45dp で、いちばん長い「ライト」(14sp で 42dp)も 1 行に収まる。
             Row(Modifier.fillMaxWidth()) {
                 val cell = Modifier.weight(1f)
-                BarButton("全体", cell) { vm.showAll() }
-                for ((part, label) in PARTS) {
-                    BarButton(label, cell, enabled = !state.frozen) { onPart(part) }
+                val whole = state.target == null && state.pendingPart == null
+                GlyphButton("全体", cell, selected = whole, onClick = vm::showAll) { faceGlyph(null) }
+                for ((part, name) in PARTS) {
+                    GlyphButton(name, cell, selected = state.pendingPart == part, enabled = !state.frozen, onClick = { onPart(part) }) {
+                        faceGlyph(part)
+                    }
                 }
-                BarButton("静止", cell, state.frozen, onClick = onFreeze)
-                BarButton("色", cell, state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
-                BarButton("ライト", cell, state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }) { vm.toggleLight() }
             }
         }
     }
@@ -319,7 +359,9 @@ private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
             vm.adjustColor { it.withKelvin(v) }
         }
         Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
-            BarButton("元に戻す") { vm.adjustColor { ColorAdjust() } }
+            TextButton({ vm.adjustColor { ColorAdjust() } }, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
+                Text("元に戻す", fontSize = 14.sp)
+            }
         }
     }
 }
@@ -354,21 +396,38 @@ private fun SliderRow(
     }
 }
 
+/** 絵だけのボタン。押せる範囲は 48dp 以上で、選んでいるあいだは下地を明るくする。長押しには手応えを返す。 */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BarButton(
-    label: String,
+private fun GlyphButton(
+    description: String,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
+    glyph: DrawScope.() -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     Box(
         modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
             .background(if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent)
-            .combinedClickable(enabled = enabled, onLongClick = onLongClick, onClick = onClick),
+            .semantics {
+                contentDescription = description
+                this.selected = selected
+            }
+            .combinedClickable(
+                enabled = enabled,
+                role = Role.Button,
+                onLongClick = onLongClick?.let { long ->
+                    {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        long()
+                    }
+                },
+                onClick = onClick,
+            ),
         Alignment.Center,
-    ) { Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.38f), fontSize = 14.sp) }
+    ) { Canvas(Modifier.size(28.dp).alpha(if (enabled) 1f else 0.38f), onDraw = glyph) }
 }
