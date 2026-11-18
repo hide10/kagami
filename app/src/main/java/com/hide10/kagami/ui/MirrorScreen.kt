@@ -101,29 +101,48 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+        // crop は見せている切り出しで、唯一の正。カメラはその上限までを切り出し、layer は実際に切り出された一枚に残りの拡大をかける。
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
+        var layer by remember(size) { mutableStateOf(Crop.full(size)) }
         val frame = remember(size) { CameraFrame(size) }
         LaunchedEffect(size) {
             // 切り出しはこの大きさのビュー座標なので、大きさが変わったら全体から始める。
+            goLive()
             vm.showAll()
+            var asked: Crop? = null
+            var askedWith: SensorMapping? = null
             var last = withFrameNanos { it }
             while (true) withFrameNanos { now ->
                 val s = vm.state.value
                 crop = CropSmoother.step(crop, s.target ?: s.extent(size), (now - last) / 1e9f)
                 last = now
                 frame.update(camera)
+                // 頼んだ範囲が届くのは数フレーム後で、端末が丸めたり無視したりもするので、残りは実際に切り出された範囲から決める。
+                // 寄りすぎた一枚(引くときの遅れ)では画像の外を見せないよう、その一枚の全体で止める。
+                layer = crop.within(s.still ?: frame.applied, size).clamp(size)
+                val mapping = frame.mapping
+                if (mapping != null && !s.frozen) {
+                    // 部位の顔を待つあいだは全体を頼む。見え方は layer がそのまま保つ。
+                    val ask = if (s.pendingPart != null) Crop.full(size) else crop
+                    if (ask != asked || mapping !== askedWith) {
+                        asked = ask
+                        askedWith = mapping
+                        camera.requested.value = mapping.toSensor(mapping.cameraPart(ask))
+                    }
+                }
             }
         }
 
         val zoomed = Modifier.fillMaxSize().graphicsLayer {
-            val t = crop.layerTransform(size)
+            val t = layer.layerTransform(size)
             scaleX = t.scale
             scaleY = t.scale
             translationX = t.translationX
             translationY = t.translationY
         }
         CameraPreview(preview, state.color, faces, camera, zoomed)
-        // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚。同じ切り出しと色をかければ止めた瞬間と同じに見える。
+        // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚で、カメラが切り出した範囲だけが写っている。
+        // その範囲を still として覚え、残りの拡大と色をかければ止めた瞬間と同じに見える。
         still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
         Box(
             Modifier.fillMaxSize()
@@ -161,7 +180,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                     preview.bitmap?.let {
                         still = it.asImageBitmap()
                         faces.cancel()
-                        vm.freeze(Crop.full(size), size)
+                        vm.freeze(frame.applied, size)
                     }
                 }
             },
