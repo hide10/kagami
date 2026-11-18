@@ -18,3 +18,7 @@ class ImageMapping(private val image: Size, view: Size, private val mirror: Bool
 
     fun toView(face: FaceLandmarks): FaceLandmarks = face.map(::toView)
 }
+
+/** センサー画像の幅・高さと回転角から、ML Kit が座標を返す正立画像の大きさ。 */
+fun uprightSize(width: Int, height: Int, rotationDegrees: Int): Size =
+    if (rotationDegrees % 180 == 0) Size(width.toFloat(), height.toFloat()) else Size(height.toFloat(), width.toFloat())

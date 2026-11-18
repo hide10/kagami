@@ -34,6 +34,14 @@ class ImageMappingTest {
     }
 
     @Test
+    fun aSensorFrameTurnedAQuarterIsSeenUpright() {
+        assertEquals(Size(480f, 640f), uprightSize(640, 480, 270))
+        assertEquals(Size(480f, 640f), uprightSize(640, 480, 90))
+        assertEquals(Size(640f, 480f), uprightSize(640, 480, 180))
+        assertEquals(Size(640f, 480f), uprightSize(640, 480, 0))
+    }
+
+    @Test
     fun mapsEveryLandmarkOfAFace() {
         val f = face(Pt(240f, 300f), 60f)
         val v = mirrored.toView(f)
