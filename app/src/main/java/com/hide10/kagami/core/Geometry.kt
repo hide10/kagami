@@ -55,7 +55,7 @@ data class Crop(val cx: Float, val cy: Float, val zoom: Float) {
     fun toSource(screen: Pt, size: Size): Pt = center + (screen - size.center) / zoom
 
     companion object {
-        const val MAX_ZOOM = 5f
+        const val MAX_ZOOM = 10f
 
         fun full(size: Size) = Crop(size.w / 2, size.h / 2, 1f)
     }

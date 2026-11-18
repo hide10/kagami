@@ -10,7 +10,7 @@ class CropTest {
     private fun randomCrop() = Crop(
         cx = rnd.nextFloat() * 3000f - 1000f,
         cy = rnd.nextFloat() * 4000f - 1000f,
-        zoom = rnd.nextFloat() * 10f - 2f,
+        zoom = rnd.nextFloat() * 16f - 2f,
     )
 
     @Test
@@ -27,7 +27,9 @@ class CropTest {
     @Test
     fun clampLimitsZoomToOneThroughMax() {
         assertEquals(1f, Crop(540f, 960f, 0.3f).clamp(PHONE).zoom)
-        assertEquals(Crop.MAX_ZOOM, Crop(540f, 960f, 40f).clamp(PHONE).zoom)
+        assertEquals(8f, Crop(540f, 960f, 8f).clamp(PHONE).zoom)
+        assertEquals(10f, Crop(540f, 960f, 10f).clamp(PHONE).zoom)
+        assertEquals(10f, Crop(540f, 960f, 40f).clamp(PHONE).zoom)
     }
 
     @Test

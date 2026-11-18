@@ -105,13 +105,13 @@ class CropPlannerTest {
     }
 
     @Test
-    fun pinchZoomStopsAtItsLimitsAndTurnsBackRightAway() {
+    fun pinchZoomStopsAtTenTimesAndTurnsBackRightAway() {
         val still = Pt(0f, 0f)
         var crop = Crop(540f, 960f, 4f)
         repeat(5) { crop = CropPlanner.transform(crop, PHONE.center, still, 1.5f, PHONE) }
-        assertEquals(Crop.MAX_ZOOM, crop.zoom)
+        assertEquals(10f, crop.zoom)
         crop = CropPlanner.transform(crop, PHONE.center, still, 0.5f, PHONE)
-        assertEquals(Crop.MAX_ZOOM / 2, crop.zoom, 1e-4f)
+        assertEquals(5f, crop.zoom, 1e-4f)
         repeat(5) { crop = CropPlanner.transform(crop, PHONE.center, still, 0.5f, PHONE) }
         assertEquals(Crop.full(PHONE), crop)
     }
@@ -123,6 +123,36 @@ class CropPlannerTest {
         assertEquals(atLeftEdge, pushed)
         val back = CropPlanner.transform(pushed, PHONE.center, Pt(-100f, 0f), 1f, PHONE)
         assertEquals(320f, back.cx, 1e-3f)
+    }
+
+    @Test
+    fun draggingAtTenTimesStopsAtEveryEdgeOfTheImage() {
+        val atLimit = Crop(540f, 960f, 10f)
+        // 10 倍では 108 x 192 px ぶんが映るので、中心は端から 54 px と 96 px までしか寄れない。
+        val pushes = mapOf(
+            Pt(30000f, 0f) to Pt(54f, 960f),
+            Pt(-30000f, 0f) to Pt(1026f, 960f),
+            Pt(0f, 30000f) to Pt(540f, 96f),
+            Pt(0f, -30000f) to Pt(540f, 1824f),
+        )
+        for ((pan, edge) in pushes) {
+            val pushed = CropPlanner.transform(atLimit, PHONE.center, pan, 1f, PHONE)
+            assertEquals(10f, pushed.zoom)
+            assertPt(edge, pushed.center, eps = 1e-3f)
+        }
+    }
+
+    @Test
+    fun gesturesAtTenTimesNeverShowOutsideTheImage() {
+        val rnd = Random(5)
+        var crop = Crop(540f, 960f, 10f)
+        repeat(2000) {
+            val centroid = Pt(rnd.nextFloat() * PHONE.w, rnd.nextFloat() * PHONE.h)
+            val pan = Pt(rnd.nextFloat() * 600f - 300f, rnd.nextFloat() * 600f - 300f)
+            crop = CropPlanner.transform(crop, centroid, pan, 1f + rnd.nextFloat(), PHONE)
+            assertEquals(10f, crop.zoom)
+            assertShowsOnlyImage(crop, PHONE)
+        }
     }
 
     @Test

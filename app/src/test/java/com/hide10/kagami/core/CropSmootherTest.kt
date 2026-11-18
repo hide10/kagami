@@ -59,7 +59,7 @@ class CropSmootherTest {
 
     @Test
     fun theWayBetweenTwoValidCropsNeverShowsOutsideTheImage() {
-        val corner = Crop(0f, 0f, 5f).clamp(PHONE)
+        val corner = Crop(0f, 0f, 10f).clamp(PHONE)
         val far = Crop(PHONE.w, PHONE.h, 1.2f).clamp(PHONE)
         for ((a, b) in listOf(corner to far, far to corner, Crop.full(PHONE) to corner)) {
             var c = a
