@@ -20,6 +20,7 @@ import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
@@ -45,6 +46,7 @@ private const val REQUEST_INTERVAL_MS = 33L
  * CameraX が解析とのあいだで 1920x1440 を保証するのは手ブレ補正の組み合わせだけで、それ以外は 1440x1080 ほどに下がる。
  * 拡大は crop.requested の SCALER_CROP_REGION をカメラに頼んで行い、撮れた一枚ごとに実際の範囲を crop に記録する。
  * Camera2CameraControl の値は CameraX 自身の拡大より後に上書きで重なるので、CameraX の拡大(倍率 1 のまま)とぶつからない。
+ * タップしたピントと露出は focus が CameraX の FocusMeteringAction で頼み、SCALER_CROP_REGION には触れない。
  */
 @OptIn(ExperimentalCamera2Interop::class)
 suspend fun runFrontCamera(
@@ -53,6 +55,7 @@ suspend fun runFrontCamera(
     view: PreviewView,
     analyzer: ImageAnalysis.Analyzer,
     crop: CameraCrop,
+    focus: CameraFocus,
 ) {
     val provider = ProcessCameraProvider.awaitInstance(context)
     val selector = CameraSelector.DEFAULT_FRONT_CAMERA
@@ -133,6 +136,8 @@ suspend fun runFrontCamera(
             (spec?.let { "base ${it.baseWidth}x${it.baseHeight} cameraZoomLimit ${it.zoomLimit}" } ?: "unsupported: the app magnifies everything"),
     )
     crop.spec = spec
+    // 切り出せるときだけ、base に対する比を Preview と同じ比の点にする factory を作る。Preview はつないだあとなので比が決まっている。
+    focus.attach(camera, view, spec?.let { SurfaceOrientedMeteringPointFactory(1f, 1f, preview) })
     val control = Camera2CameraControl.from(camera.cameraControl)
     try {
         // StateFlow は同じ値を流さず、待っているあいだに来た値は最後の一つだけ残る。動いている最中は 1 フレームに 1 度、止まれば最後の範囲が必ず届く。
@@ -145,6 +150,7 @@ suspend fun runFrontCamera(
             delay(REQUEST_INTERVAL_MS)
         }
     } finally {
+        focus.detach()
         crop.spec = null
         provider.unbind(preview, analysis)
         analysisThread.shutdown()

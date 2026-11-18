@@ -67,6 +67,9 @@ data class Crop(val cx: Float, val cy: Float, val zoom: Float) {
     /** layerTransform の逆。画面上の点(タップ位置)を元座標へ。 */
     fun toSource(screen: Pt, size: Size): Pt = center + (screen - size.center) / zoom
 
+    /** toSource の逆。元座標の点が画面のどこに映るか。 */
+    fun toScreen(source: Pt, size: Size): Pt = size.center + (source - center) * zoom
+
     companion object {
         const val MAX_ZOOM = 10f
 

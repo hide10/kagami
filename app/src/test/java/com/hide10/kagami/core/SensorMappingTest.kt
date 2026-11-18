@@ -45,6 +45,34 @@ class SensorMappingTest {
     }
 
     @Test
+    fun theTopLeftOfTheScreenIsMeteredAtTheSensorCornerTheRotationAndMirrorBringThere() {
+        for ((rotation, mirror) in cases) {
+            val corner = sensorCornerAtScreenTopLeft.getValue(rotation to mirror)
+            val expected = Pt(if (corner[1] == 'L') 0f else 1f, if (corner[0] == 'T') 0f else 1f)
+            val metered = SensorMapping(spec(rotation, mirror), fittedView(rotation)).baseFraction(Pt(0f, 0f))
+            assertPt(expected, metered, eps = 1e-5f)
+        }
+    }
+
+    @Test
+    fun theMeteredPointIsTheMiddleOfWhatTheCameraCropsToShowIt() {
+        val rnd = Random(5)
+        for (active in listOf(4000 to 3000, 4000 to 2250)) {
+            for ((rotation, mirror) in cases) {
+                val s = spec(rotation, mirror, active = active)
+                val mapping = SensorMapping(s, PHONE)
+                repeat(100) {
+                    val shown = Crop(rnd.nextFloat() * PHONE.w, rnd.nextFloat() * PHONE.h, 1f + rnd.nextFloat() * 5f).clamp(PHONE)
+                    val rect = mapping.toSensor(mapping.cameraPart(shown))
+                    val f = mapping.baseFraction(shown.center)
+                    val metered = Pt(s.baseLeft + f.x * s.baseWidth, s.baseTop + f.y * s.baseHeight)
+                    assertPt(Pt((rect.left + rect.right) / 2f, (rect.top + rect.bottom) / 2f), metered, eps = 1f)
+                }
+            }
+        }
+    }
+
+    @Test
     fun anOffCentreCropReadsTheMatchingPartOfTheSensor() {
         // ビューの左 1/4、上から 3/8 の点を中心に 4 倍。正立像では (1000, 1125) 画素(横長)か (750, 1500) 画素(縦長)で、切り出しは 1000x750。
         val expected = mapOf(

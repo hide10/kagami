@@ -51,6 +51,24 @@ class CropTest {
     }
 
     @Test
+    fun toScreenFindsWhereTheLayerDrawsAPoint() {
+        repeat(200) {
+            val crop = randomCrop().clamp(PHONE)
+            val p = Pt(rnd.nextFloat() * PHONE.w, rnd.nextFloat() * PHONE.h)
+            assertPt(screenOf(p, crop, PHONE), crop.toScreen(p, PHONE), eps = 1e-2f)
+        }
+    }
+
+    @Test
+    fun aTappedPointEndsUpInTheMiddleOnceTheViewHasZoomedToIt() {
+        val shown = Crop(400f, 900f, 1.5f)
+        val tapped = shown.toSource(Pt(800f, 500f), PHONE)
+        val target = CropPlanner.tap(Pt(800f, 500f), shown, PHONE)
+        assertPt(Pt(800f, 500f), shown.toScreen(tapped, PHONE))
+        assertPt(PHONE.center, target.toScreen(tapped, PHONE))
+    }
+
+    @Test
     fun clampInsideAFrameKeepsTheCropWithinThatFrame() {
         val frame = Crop(300f, 700f, 2.5f)
         repeat(2000) {

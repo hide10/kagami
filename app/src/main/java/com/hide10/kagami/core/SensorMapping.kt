@@ -116,6 +116,12 @@ class SensorMapping(private val spec: SensorSpec, private val view: Size) {
         return Crop(c.x, c.y, spec.zoomOf(applied))
     }
 
+    /** ビューの点 p に映っているセンサー上の点を、base の中の比(センサーの向きで 0..1)で表す。ピントと露出を測る点に使う。 */
+    fun baseFraction(p: Pt): Pt {
+        val s = sensorOf(p)
+        return Pt((s.x - spec.baseLeft) / spec.baseWidth, (s.y - spec.baseTop) / spec.baseHeight)
+    }
+
     private fun sensorOf(p: Pt): Pt {
         val shownX = (p.x - offset.x) / scale
         val uy = (p.y - offset.y) / scale

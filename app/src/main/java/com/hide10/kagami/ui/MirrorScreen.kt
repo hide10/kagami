@@ -6,7 +6,10 @@ import android.view.View
 import android.view.WindowManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -72,6 +75,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -95,6 +99,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hide10.kagami.camera.CameraCrop
+import com.hide10.kagami.camera.CameraFocus
 import com.hide10.kagami.camera.FaceAnalyzer
 import com.hide10.kagami.camera.runFrontCamera
 import com.hide10.kagami.core.ColorAdjust
@@ -121,6 +126,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     val camera = remember { CameraCrop() }
     val faces = remember { FaceAnalyzer(camera) }
     DisposableEffect(faces) { onDispose { faces.close() } }
+    val focus = remember { CameraFocus() }
     val context = LocalContext.current
     val preview = remember { PreviewView(context).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
 
@@ -149,6 +155,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
         var layer by remember(size) { mutableStateOf(Crop.full(size)) }
         val frame = remember(size) { CameraFrame(size) }
+        var focused by remember(size) { mutableStateOf<FocusMark?>(null) }
         LaunchedEffect(size) {
             // 切り出しはこの大きさのビュー座標なので、大きさが変わったら全体から始める。
             goLive()
@@ -207,10 +214,11 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                 }
                 .background(Color.Black),
         ) {
-            CameraPreview(preview, state.color, faces, camera, zoomed)
+            CameraPreview(preview, state.color, faces, camera, focus, zoomed)
             // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚で、カメラが切り出した範囲だけが写っている。
             // その範囲を still として覚え、残りの拡大と色をかければ止めた瞬間と同じに見える。
             still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
+            FocusRing(focused, { crop }, size)
             Box(
                 Modifier.fillMaxSize()
                     .pointerInput(size) {
@@ -220,7 +228,15 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 toggleFreeze()
                             },
-                        ) { vm.moveTo(CropPlanner.tap(Pt(it.x, it.y), crop, size, vm.state.value.extent(size))) }
+                        ) {
+                            val tap = Pt(it.x, it.y)
+                            // 寄るのと同じ点にピントと露出を合わせる。止めた一枚はカメラの今の映像ではないので合わせない。
+                            if (!vm.state.value.frozen) {
+                                val seen = crop.toSource(tap, size)
+                                if (focus.at(seen, frame.mapping, crop.zoom)) focused = FocusMark(seen)
+                            }
+                            vm.moveTo(CropPlanner.tap(tap, crop, size, vm.state.value.extent(size)))
+                        }
                     }
                     .pointerInput(size) {
                         detectTransformGestures { centroid, pan, zoom, _ ->
@@ -356,13 +372,39 @@ private fun LightBand(light: ScreenLight, glow: Color) {
     )
 }
 
+/** ピントを合わせた点(画像全体を倍率 1 で見たビュー座標)。タップのたびに作り直すので、同じ点をもう一度タップしても印が出直す。 */
+private class FocusMark(val at: Pt)
+
+/** 合わせた点に二重の輪を出し、FOCUS_FADE_MS で消す。輪は映像と一緒に動くので、その点へ寄っていくあいだも合わせた所に重なる。 */
 @Composable
-private fun CameraPreview(view: PreviewView, color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, crop: CameraCrop, modifier: Modifier) {
+private fun FocusRing(mark: FocusMark?, crop: () -> Crop, view: Size) {
+    val fade = remember { Animatable(0f) }
+    LaunchedEffect(mark) {
+        if (mark == null) return@LaunchedEffect
+        fade.snapTo(1f)
+        fade.animateTo(0f, tween(FOCUS_FADE_MS, easing = LinearEasing))
+    }
+    Canvas(Modifier.fillMaxSize()) {
+        val a = fade.value
+        if (mark == null || a == 0f) return@Canvas
+        val c = crop().toScreen(mark.at, view).let { Offset(it.x, it.y) }
+        // 外の輪は消えながら少し縮む。暗い縁取りの上に白で描くので、明るい肌の上でも見える。
+        for (r in listOf(36.dp.toPx() * (1f + 0.2f * a), 12.dp.toPx())) {
+            drawCircle(Color.Black.copy(alpha = 0.3f * a), r, c, style = Stroke(3.dp.toPx()))
+            drawCircle(Color.White.copy(alpha = a), r, c, style = Stroke(1.5.dp.toPx()))
+        }
+    }
+}
+
+private const val FOCUS_FADE_MS = 800
+
+@Composable
+private fun CameraPreview(view: PreviewView, color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, crop: CameraCrop, focus: CameraFocus, modifier: Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var noCamera by remember { mutableStateOf(false) }
-    LaunchedEffect(view, analyzer, crop) {
-        runFrontCamera(context, owner, view, analyzer, crop)
+    LaunchedEffect(view, analyzer, crop, focus) {
+        runFrontCamera(context, owner, view, analyzer, crop, focus)
         noCamera = true
     }
     if (noCamera) {
