@@ -21,10 +21,18 @@ data class MirrorState(
     /** 見せられるいちばん広い範囲。止めているあいだは止めた一枚の範囲、ほかはカメラの全体。 */
     fun extent(size: Size) = still ?: Crop.full(size)
 
-    fun toggle(p: Panel) = copy(panel = p.takeUnless { it == panel })
+    /** ライトのパネルは点いているあいだだけ開くので、消えているときに開けばライトも点ける。 */
+    fun toggle(p: Panel) = when {
+        p == panel -> copy(panel = null)
+        p == Panel.LIGHT -> copy(panel = p, light = light.copy(on = true))
+        else -> copy(panel = p)
+    }
 
-    /** ライトの点灯と消灯だけを切り替える。光の量と色温度、開いているパネルはそのまま。 */
-    fun toggleLight() = copy(light = light.copy(on = !light.on))
+    /** ライトの点灯と消灯を切り替える。光の量と色温度はそのまま。消したらライトのパネルも閉じ、点け直しても開かない。 */
+    fun toggleLight(): MirrorState {
+        val on = !light.on
+        return copy(light = light.copy(on = on), panel = panel.takeUnless { !on && it == Panel.LIGHT })
+    }
 
     fun showAll() = copy(target = null, pendingPart = null)
 

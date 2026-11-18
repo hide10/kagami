@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
 
 class MirrorStateTest {
     private val f = face(Pt(540f, 900f), 250f)
@@ -161,24 +162,60 @@ class MirrorStateTest {
     }
 
     @Test
-    fun theLightTurnsOnAndOffWithoutOpeningOrClosingAPanel() {
+    fun turningTheLightOnOpensNoPanel() {
         val on = MirrorState().toggleLight()
         assertTrue(on.light.on)
         assertNull(on.panel)
         assertFalse(on.toggleLight().light.on)
-
-        val withPanel = MirrorState().toggle(Panel.LIGHT)
-        assertEquals(Panel.LIGHT, withPanel.toggleLight().panel)
-        assertEquals(Panel.LIGHT, withPanel.toggleLight().toggleLight().panel)
     }
 
     @Test
-    fun theLightPanelOpensAndClosesWithoutSwitchingTheLight() {
-        assertFalse(MirrorState().toggle(Panel.LIGHT).light.on)
+    fun turningTheLightOffClosesItsPanelAndTurningItOnAgainDoesNotReopenIt() {
+        val open = MirrorState().toggleLight().toggle(Panel.LIGHT)
+        assertEquals(Panel.LIGHT, open.panel)
+        val off = open.toggleLight()
+        assertFalse(off.light.on)
+        assertNull(off.panel)
+        assertNull(off.toggleLight().panel)
+    }
+
+    @Test
+    fun turningTheLightOffLeavesTheColorPanelOpen() {
+        val coloring = MirrorState().toggleLight().toggle(Panel.COLOR)
+        assertEquals(Panel.COLOR, coloring.toggleLight().panel)
+        assertEquals(Panel.COLOR, coloring.toggleLight().toggleLight().panel)
+    }
+
+    @Test
+    fun openingTheLightPanelWhileTheLightIsOffTurnsItOn() {
+        val opened = MirrorState().toggle(Panel.LIGHT)
+        assertTrue(opened.light.on)
+        assertEquals(Panel.LIGHT, opened.panel)
+        assertEquals(Panel.LIGHT, MirrorState().toggle(Panel.COLOR).toggle(Panel.LIGHT).panel)
+    }
+
+    @Test
+    fun closingOrSwitchingAwayFromTheLightPanelLeavesTheLightOn() {
         val lit = MirrorState().toggleLight()
         assertTrue(lit.toggle(Panel.LIGHT).light.on)
         assertTrue(lit.toggle(Panel.LIGHT).toggle(Panel.LIGHT).light.on)
+        assertTrue(lit.toggle(Panel.LIGHT).toggle(Panel.COLOR).light.on)
         assertTrue(lit.toggle(Panel.COLOR).light.on)
+    }
+
+    @Test
+    fun theLightPanelNeverShowsWhileTheLightIsOff() {
+        val rnd = Random(3)
+        val steps = listOf<(MirrorState) -> MirrorState>(
+            { it.toggleLight() },
+            { it.toggle(Panel.LIGHT) },
+            { it.toggle(Panel.COLOR) },
+        )
+        var s = MirrorState()
+        repeat(2000) {
+            s = steps[rnd.nextInt(steps.size)](s)
+            assertTrue("$s", s.panel != Panel.LIGHT || s.light.on)
+        }
     }
 
     @Test
@@ -193,7 +230,7 @@ class MirrorStateTest {
     @Test
     fun theLightKeepsItsModeAcrossOffOnAndThePanels() {
         val shrink = MirrorState(light = ScreenLight(mode = LightMode.SHRINK))
-        val again = shrink.toggleLight().toggle(Panel.LIGHT).toggleLight().toggle(Panel.LIGHT).toggleLight()
+        val again = shrink.toggleLight().toggle(Panel.LIGHT).toggleLight().toggle(Panel.LIGHT)
         assertTrue(again.light.on)
         assertEquals(LightMode.SHRINK, again.light.mode)
         assertEquals(LightMode.SHRINK, again.toggle(Panel.COLOR).toggle(Panel.COLOR).light.mode)
