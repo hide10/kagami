@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.hide10.kagami"
+    namespace = "com.kbcode.kagami"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.hide10.kagami"
+        applicationId = "com.kbcode.kagami"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
