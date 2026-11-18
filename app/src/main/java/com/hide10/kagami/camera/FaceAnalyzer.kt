@@ -13,19 +13,28 @@ import com.hide10.kagami.core.FaceLandmarks
 import com.hide10.kagami.core.Pt
 import com.hide10.kagami.core.Size
 import com.hide10.kagami.core.uprightSize
+import java.util.concurrent.atomic.AtomicReference
 
-/** いちばん大きな顔を、正立画像(非ミラー)の座標で onFace に渡す。onFace はメインスレッドで呼ばれる。 */
-class FaceAnalyzer(private val onFace: (face: FaceLandmarks, image: Size) -> Unit) : ImageAnalysis.Analyzer, AutoCloseable {
+/** 頼まれたときだけ顔を探す。頼まれていないフレームは ML Kit に渡さずに閉じる。 */
+class FaceAnalyzer : ImageAnalysis.Analyzer, AutoCloseable {
     private val detector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .build(),
     )
+    private val request = AtomicReference<((FaceLandmarks, Size) -> Unit)?>()
+
+    /**
+     * 次に届くフレームでいちばん大きな顔を一度だけ探し、正立画像(非ミラー)の座標で onFace に渡す。顔が無ければ何も呼ばない。
+     * フレームが届く前に呼び直すと、前の onFace は呼ばれない。onFace はメインスレッドで呼ばれる。
+     */
+    fun requestFace(onFace: (face: FaceLandmarks, image: Size) -> Unit) = request.set(onFace)
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(proxy: ImageProxy) {
         val media = proxy.image ?: return proxy.close()
+        val onFace = request.getAndSet(null) ?: return proxy.close()
         val rotation = proxy.imageInfo.rotationDegrees
         val image = uprightSize(proxy.width, proxy.height, rotation)
         detector.process(InputImage.fromMediaImage(media, rotation))

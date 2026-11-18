@@ -5,6 +5,7 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.view.View
 import android.view.WindowManager
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +33,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -52,12 +52,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hide10.kagami.camera.FaceAnalyzer
 import com.hide10.kagami.camera.runFrontCamera
 import com.hide10.kagami.core.ColorAdjust
 import com.hide10.kagami.core.Crop
 import com.hide10.kagami.core.CropPlanner
 import com.hide10.kagami.core.CropSmoother
-import com.hide10.kagami.core.FaceLandmarks
 import com.hide10.kagami.core.FacePart
 import com.hide10.kagami.core.ImageMapping
 import com.hide10.kagami.core.MirrorState
@@ -70,6 +70,8 @@ import kotlin.math.roundToInt
 @Composable
 fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val faces = remember { FaceAnalyzer() }
+    DisposableEffect(faces) { onDispose { faces.close() } }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
@@ -85,7 +87,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
 
         CameraPreview(
             color = state.color,
-            onFace = { face, image -> vm.faceFound(ImageMapping(image, size, mirror = true).toView(face), size) },
+            analyzer = faces,
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 val t = crop.layerTransform(size)
                 scaleX = t.scale
@@ -105,7 +107,15 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                 },
         )
         if (state.light.on) LightFrame(state.light)
-        Controls(state, vm, Modifier.align(Alignment.BottomCenter))
+        Controls(
+            state,
+            vm,
+            onPart = { part ->
+                vm.request(part)
+                faces.requestFace { face, image -> vm.faceFound(ImageMapping(image, size, mirror = true).toView(face), size) }
+            },
+            Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
@@ -135,14 +145,13 @@ private fun LightFrame(light: ScreenLight) {
 }
 
 @Composable
-private fun CameraPreview(color: ColorAdjust, onFace: (FaceLandmarks, Size) -> Unit, modifier: Modifier) {
+private fun CameraPreview(color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, modifier: Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val view = remember { PreviewView(context).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
-    val latestOnFace by rememberUpdatedState(onFace)
     var noCamera by remember { mutableStateOf(false) }
-    LaunchedEffect(view) {
-        runFrontCamera(context, owner, view) { face, image -> latestOnFace(face, image) }
+    LaunchedEffect(view, analyzer) {
+        runFrontCamera(context, owner, view, analyzer)
         noCamera = true
     }
     if (noCamera) {
@@ -169,7 +178,7 @@ private val PARTS = listOf(
 )
 
 @Composable
-private fun Controls(state: MirrorState, vm: MirrorViewModel, modifier: Modifier) {
+private fun Controls(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) -> Unit, modifier: Modifier) {
     // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
     Surface(modifier.fillMaxWidth(), color = Color.Black.copy(alpha = 0.35f), contentColor = Color.White) {
         Column(Modifier.navigationBarsPadding().padding(vertical = 4.dp)) {
@@ -181,7 +190,7 @@ private fun Controls(state: MirrorState, vm: MirrorViewModel, modifier: Modifier
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 BarButton("全体") { vm.showAll() }
                 for ((part, label) in PARTS) {
-                    BarButton(label) { vm.request(part) }
+                    BarButton(label) { onPart(part) }
                 }
                 BarButton("色", state.panel == Panel.COLOR) { vm.toggle(Panel.COLOR) }
                 BarButton("ライト", state.panel == Panel.LIGHT) { vm.toggle(Panel.LIGHT) }

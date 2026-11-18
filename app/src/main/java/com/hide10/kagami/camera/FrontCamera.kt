@@ -12,19 +12,17 @@ import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import com.hide10.kagami.core.FaceLandmarks
-import com.hide10.kagami.core.Size
 import kotlinx.coroutines.awaitCancellation
 
 /**
- * 前面カメラをプレビューと顔検出につなぎ、キャンセルされるまで保つ。前面カメラが無いときだけ戻る。
+ * 前面カメラをプレビューと analyzer につなぎ、キャンセルされるまで保つ。前面カメラが無いときだけ戻る。
  * ImageMapping のためにプレビューと解析を同じ 4:3 にそろえる。
  */
 suspend fun runFrontCamera(
     context: Context,
     owner: LifecycleOwner,
     view: PreviewView,
-    onFace: (face: FaceLandmarks, image: Size) -> Unit,
+    analyzer: ImageAnalysis.Analyzer,
 ) {
     val provider = ProcessCameraProvider.awaitInstance(context)
     val selector = CameraSelector.DEFAULT_FRONT_CAMERA
@@ -48,13 +46,11 @@ suspend fun runFrontCamera(
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .build()
 
-    FaceAnalyzer(onFace).use { analyzer ->
-        analysis.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
-        provider.bindToLifecycle(owner, selector, preview, analysis)
-        try {
-            awaitCancellation()
-        } finally {
-            provider.unbind(preview, analysis)
-        }
+    analysis.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
+    provider.bindToLifecycle(owner, selector, preview, analysis)
+    try {
+        awaitCancellation()
+    } finally {
+        provider.unbind(preview, analysis)
     }
 }
