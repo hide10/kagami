@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kagami Mirror</string>
+
+    <string name="camera_permission_reason">The camera is used only as a mirror. Video is never saved or sent.</string>
+    <string name="camera_permission_allow">Allow camera</string>
+    <string name="no_front_camera">No front camera found</string>
+
+    <string name="button_light">Light</string>
+    <string name="button_pause">Pause</string>
+    <string name="button_color">Color and brightness</string>
+    <string name="button_info">Info</string>
+    <string name="zoom_track">Drag up or down to zoom</string>
+
+    <string name="part_all">Full view</string>
+    <string name="part_left_eye">Left eye</string>
+    <string name="part_right_eye">Right eye</string>
+    <string name="part_nose">Nose</string>
+    <string name="part_mouth">Mouth</string>
+
+    <string name="exposure">Exposure</string>
+    <string name="color_temperature">Warmth</string>
+    <string name="reset">Reset</string>
+    <string name="light_mode">Style</string>
+    <string name="light_mode_band">Edge</string>
+    <string name="light_mode_shrink">Shrink</string>
+    <string name="light_amount">Amount</string>
+
+    <string name="help_title">How to use</string>
+    <string name="close">Close</string>
+    <string name="hint_focus">Focus</string>
+    <string name="hint_light">Light on/off</string>
+    <string name="hint_pause">Pause</string>
+    <string name="hint_zoom">Zoom</string>
+    <string name="hint_exposure">Exposure</string>
+    <string name="hint_full_screen">Full screen</string>
+
+    <string name="gesture_tap">Tap</string>
+    <string name="gesture_double_tap">Double tap</string>
+    <string name="gesture_long_press">Long press</string>
+    <string name="gesture_edge_drag">Drag up or down on the right edge</string>
+    <string name="gesture_pinch">Pinch</string>
+    <string name="gesture_two_finger_vertical">Two-finger drag up or down</string>
+    <string name="gesture_two_finger_horizontal">Two-finger drag sideways</string>
+    <string name="gesture_two_finger_tap">Two-finger tap</string>
+</resources>

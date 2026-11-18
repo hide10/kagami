@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.os.SystemClock
 import android.view.View
 import android.view.WindowManager
+import androidx.annotation.StringRes
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
@@ -84,6 +85,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -103,6 +105,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kbcode.kagami.R
 import com.kbcode.kagami.camera.CameraCrop
 import com.kbcode.kagami.camera.CameraFocus
 import com.kbcode.kagami.camera.FaceAnalyzer
@@ -324,9 +327,10 @@ private val THUMB_INK = Color(0xFF424242)
 private fun ZoomTrack(zoom: () -> Float, onDrag: (dy: Float, length: Float) -> Unit, modifier: Modifier) {
     val drag by rememberUpdatedState(onDrag)
     val text = rememberTextMeasurer()
+    val description = stringResource(R.string.zoom_track)
     Box(
         modifier
-            .semantics { contentDescription = "上下になぞって拡大・縮小" }
+            .semantics { contentDescription = description }
             .pointerInput(Unit) {
                 detectVerticalDragGestures { change, dy ->
                     change.consume()
@@ -479,7 +483,7 @@ private fun CameraPreview(view: PreviewView, color: ColorAdjust, analyzer: Image
         noCamera = true
     }
     if (noCamera) {
-        Box(modifier, Alignment.Center) { Text("前面カメラが見つかりません", color = Color.White) }
+        Box(modifier, Alignment.Center) { Text(stringResource(R.string.no_front_camera), color = Color.White) }
     } else {
         AndroidView({ view }, modifier) { it.tint(color) }
     }
@@ -527,10 +531,10 @@ private fun PreviewView.tint(color: ColorAdjust) {
 private fun ColorAdjust.filter() = if (isNeutral) null else ColorFilter.colorMatrix(ColorMatrix(matrix()))
 
 private val PARTS = listOf(
-    FacePart.LEFT_EYE to "左目",
-    FacePart.RIGHT_EYE to "右目",
-    FacePart.NOSE to "鼻",
-    FacePart.MOUTH to "口",
+    FacePart.LEFT_EYE to R.string.part_left_eye,
+    FacePart.RIGHT_EYE to R.string.part_right_eye,
+    FacePart.NOSE to R.string.part_nose,
+    FacePart.MOUTH to R.string.part_mouth,
 )
 
 /** アイコンの下に敷く暗い下地。光っている画面の上でも白いアイコンが読める濃さ。 */
@@ -548,13 +552,13 @@ private fun FunctionRow(state: MirrorState, vm: MirrorViewModel, helping: Boolea
         // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
         Surface(shape = CircleShape, color = SCRIM, contentColor = Color.White) {
             Row {
-                GlyphButton("ライト", selected = state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }, onClick = vm::toggleLight) {
+                GlyphButton(R.string.button_light, selected = state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }, onClick = vm::toggleLight) {
                     bulbGlyph(state.light.on)
                 }
-                GlyphButton("静止", selected = state.frozen, onClick = onFreeze) { pauseGlyph(state.frozen) }
+                GlyphButton(R.string.button_pause, selected = state.frozen, onClick = onFreeze) { pauseGlyph(state.frozen) }
                 val coloring = state.panel == Panel.COLOR
-                GlyphButton("色・明るさ", selected = coloring, onClick = { vm.toggle(Panel.COLOR) }) { slidersGlyph(coloring) }
-                GlyphButton("情報", selected = helping, onClick = onHelp) { infoGlyph(helping) }
+                GlyphButton(R.string.button_color, selected = coloring, onClick = { vm.toggle(Panel.COLOR) }) { slidersGlyph(coloring) }
+                GlyphButton(R.string.button_info, selected = helping, onClick = onHelp) { infoGlyph(helping) }
             }
         }
     }
@@ -573,7 +577,7 @@ private fun PartBar(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) 
             Row(Modifier.fillMaxWidth()) {
                 val cell = Modifier.weight(1f)
                 val whole = state.target == null && state.pendingPart == null
-                GlyphButton("全体", cell, selected = whole, onClick = vm::showAll) { partGlyph(null) }
+                GlyphButton(R.string.part_all, cell, selected = whole, onClick = vm::showAll) { partGlyph(null) }
                 for ((part, name) in PARTS) {
                     GlyphButton(name, cell, selected = state.pendingPart == part, enabled = !state.frozen, onClick = { onPart(part) }) {
                         partGlyph(part)
@@ -587,15 +591,15 @@ private fun PartBar(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) 
 @Composable
 private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
     Column(Modifier.padding(horizontal = 16.dp)) {
-        SliderRow("明るさ", "%+.1f EV".format(color.exposureEv), color.exposureEv, ColorAdjust.EV) { v ->
+        SliderRow(R.string.exposure, stringResource(R.string.exposure_value, color.exposureEv), color.exposureEv, ColorAdjust.EV) { v ->
             vm.adjustColor { it.withExposure(v) }
         }
-        SliderRow("色温度", kelvinLabel(color.kelvin), color.kelvin, ColorAdjust.KELVIN) { v ->
+        SliderRow(R.string.color_temperature, kelvinLabel(color.kelvin), color.kelvin, ColorAdjust.KELVIN) { v ->
             vm.adjustColor { it.withKelvin(v) }
         }
         Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
             TextButton({ vm.adjustColor { ColorAdjust() } }, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
-                Text("元に戻す", fontSize = 14.sp)
+                Text(stringResource(R.string.reset), fontSize = 14.sp)
             }
         }
     }
@@ -605,43 +609,47 @@ private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
 private fun LightPanel(light: ScreenLight, vm: MirrorViewModel) {
     Column(Modifier.padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("光り方", Modifier.width(64.dp))
+            Text(stringResource(R.string.light_mode), Modifier.width(LABEL_WIDTH))
             SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
                 LIGHT_MODES.forEachIndexed { i, (mode, name) ->
                     SegmentedButton(
                         selected = light.mode == mode,
                         onClick = { vm.adjustLight { it.copy(mode = mode) } },
                         shape = SegmentedButtonDefaults.itemShape(i, LIGHT_MODES.size),
-                    ) { Text(name) }
+                    ) { Text(stringResource(name)) }
                 }
             }
         }
         val percent = (light.thicknessDp / ScreenLight.THICKNESS_DP.endInclusive * 100).roundToInt()
-        SliderRow("光の量", "$percent%", light.thicknessDp, ScreenLight.THICKNESS_DP) { v ->
+        SliderRow(R.string.light_amount, stringResource(R.string.percent_value, percent), light.thicknessDp, ScreenLight.THICKNESS_DP) { v ->
             vm.adjustLight { it.withThickness(v) }
         }
-        SliderRow("色温度", kelvinLabel(light.kelvin), light.kelvin, ScreenLight.KELVIN) { v ->
+        SliderRow(R.string.color_temperature, kelvinLabel(light.kelvin), light.kelvin, ScreenLight.KELVIN) { v ->
             vm.adjustLight { it.copy(kelvin = v) }
         }
     }
 }
 
-private val LIGHT_MODES = listOf(LightMode.BAND to "縁", LightMode.SHRINK to "縮小")
+private val LIGHT_MODES = listOf(LightMode.BAND to R.string.light_mode_band, LightMode.SHRINK to R.string.light_mode_shrink)
 
-private fun kelvinLabel(kelvin: Float) = "${(kelvin / 100f).roundToInt() * 100}K"
+@Composable
+private fun kelvinLabel(kelvin: Float) = stringResource(R.string.kelvin_value, (kelvin / 100f).roundToInt() * 100)
+
+/** パネルの項目名の幅。英語のいちばん長い「Exposure」が 1 行に収まる。 */
+private val LABEL_WIDTH = 72.dp
 
 @Composable
 private fun SliderRow(
-    label: String,
+    @StringRes label: Int,
     shown: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     onChange: (Float) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.width(64.dp))
+        Text(stringResource(label), Modifier.width(LABEL_WIDTH))
         Slider(value, onChange, Modifier.weight(1f), valueRange = range)
-        Text(shown, Modifier.width(80.dp), textAlign = TextAlign.End)
+        Text(shown, Modifier.width(72.dp), textAlign = TextAlign.End)
     }
 }
 
@@ -649,7 +657,7 @@ private fun SliderRow(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GlyphButton(
-    description: String,
+    @StringRes description: Int,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     enabled: Boolean = true,
@@ -658,12 +666,13 @@ private fun GlyphButton(
     glyph: DrawScope.() -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
+    val name = stringResource(description)
     Box(
         modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
             .background(if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent)
             .semantics {
-                contentDescription = description
+                contentDescription = name
                 this.selected = selected
             }
             .combinedClickable(

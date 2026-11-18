@@ -1,5 +1,6 @@
 package com.kbcode.kagami.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,20 +17,22 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.kbcode.kagami.R
 
-/** 指の操作ひとつ。操作の絵と、それでできることの一言。訳すときのために英語も持つ。 */
-private class Hint(val icons: List<GestureIcon>, val ja: String, val en: String)
+/** 指の操作ひとつ。操作の絵と、それでできることの一言。 */
+private class Hint(val icons: List<GestureIcon>, @StringRes val text: Int)
 
 private val HINTS = listOf(
-    Hint(listOf(GestureIcon.TAP), "ピント調整", "Focus"),
-    Hint(listOf(GestureIcon.DOUBLE_TAP), "ライト オン・オフ", "Light on/off"),
-    Hint(listOf(GestureIcon.LONG_PRESS), "一時停止", "Pause"),
-    Hint(listOf(GestureIcon.EDGE_DRAG, GestureIcon.PINCH, GestureIcon.TWO_FINGER_VERTICAL), "ズーム", "Zoom"),
-    Hint(listOf(GestureIcon.TWO_FINGER_HORIZONTAL), "露出", "Exposure"),
-    Hint(listOf(GestureIcon.TWO_FINGER_TAP), "全面モード", "Full screen"),
+    Hint(listOf(GestureIcon.TAP), R.string.hint_focus),
+    Hint(listOf(GestureIcon.DOUBLE_TAP), R.string.hint_light),
+    Hint(listOf(GestureIcon.LONG_PRESS), R.string.hint_pause),
+    Hint(listOf(GestureIcon.EDGE_DRAG, GestureIcon.PINCH, GestureIcon.TWO_FINGER_VERTICAL), R.string.hint_zoom),
+    Hint(listOf(GestureIcon.TWO_FINGER_HORIZONTAL), R.string.hint_exposure),
+    Hint(listOf(GestureIcon.TWO_FINGER_TAP), R.string.hint_full_screen),
 )
 
 private val ICON = 36.dp
@@ -43,18 +46,19 @@ private val ICONS_WIDTH = HINTS.maxOf { it.icons.size }.let { ICON * it + ICON_G
 fun HelpDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onDismiss) { Text("閉じる") } },
-        title = { Text("使い方") },
+        confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.close)) } },
+        title = { Text(stringResource(R.string.help_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 for (hint in HINTS) {
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Row(Modifier.width(ICONS_WIDTH), Arrangement.spacedBy(ICON_GAP, Alignment.End)) {
                             for (icon in hint.icons) {
-                                Canvas(Modifier.size(ICON).semantics { contentDescription = icon.ja }) { gestureGlyph(icon) }
+                                val name = stringResource(icon.label)
+                                Canvas(Modifier.size(ICON).semantics { contentDescription = name }) { gestureGlyph(icon) }
                             }
                         }
-                        Text(hint.ja, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(hint.text), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }

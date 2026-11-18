@@ -1,5 +1,6 @@
 package com.kbcode.kagami.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -9,20 +10,21 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import com.kbcode.kagami.R
 
 // 指の操作の絵。指先は薄い縁のついた白い丸で、指の数がそのまま丸の数になる。動きの矢印と触れた輪は ACCENT で描く。
 // 格子は Glyphs.kt と同じ 24×24。
 
-/** 使い方に出す指の操作。ja と en は絵の読み上げに使う操作の名前。 */
-enum class GestureIcon(val ja: String, val en: String) {
-    TAP("タップ", "Tap"),
-    DOUBLE_TAP("ダブルタップ", "Double tap"),
-    LONG_PRESS("長押し", "Long press"),
-    EDGE_DRAG("右端の上下ドラッグ", "Drag up or down on the right edge"),
-    PINCH("ピンチ", "Pinch"),
-    TWO_FINGER_VERTICAL("2本指の上下ドラッグ", "Two-finger drag up or down"),
-    TWO_FINGER_HORIZONTAL("2本指の水平ドラッグ", "Two-finger drag sideways"),
-    TWO_FINGER_TAP("2本指タップ", "Two-finger tap"),
+/** 使い方に出す指の操作。label は絵の読み上げに使う操作の名前。 */
+enum class GestureIcon(@StringRes val label: Int) {
+    TAP(R.string.gesture_tap),
+    DOUBLE_TAP(R.string.gesture_double_tap),
+    LONG_PRESS(R.string.gesture_long_press),
+    EDGE_DRAG(R.string.gesture_edge_drag),
+    PINCH(R.string.gesture_pinch),
+    TWO_FINGER_VERTICAL(R.string.gesture_two_finger_vertical),
+    TWO_FINGER_HORIZONTAL(R.string.gesture_two_finger_horizontal),
+    TWO_FINGER_TAP(R.string.gesture_two_finger_tap),
 }
 
 private val MID = Offset(12f, 12f)

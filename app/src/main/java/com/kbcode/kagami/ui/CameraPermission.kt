@@ -23,11 +23,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.kbcode.kagami.R
 
 private enum class Access { ASKING, GRANTED, DENIED }
 
@@ -51,7 +53,7 @@ fun CameraPermissionGate(content: @Composable () -> Unit) {
             Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
             Alignment.CenterHorizontally,
         ) {
-            Text("鏡として映すためにカメラを使います。映像は保存も送信もしません。")
+            Text(stringResource(R.string.camera_permission_reason))
             Button({
                 // 2回断ると許可ダイアログはもう出ないので、アプリの設定画面から許可してもらう。
                 if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)) {
@@ -61,7 +63,7 @@ fun CameraPermissionGate(content: @Composable () -> Unit) {
                         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)),
                     )
                 }
-            }) { Text("カメラを許可する") }
+            }) { Text(stringResource(R.string.camera_permission_allow)) }
         }
     }
 }

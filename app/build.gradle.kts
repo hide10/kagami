@@ -28,6 +28,11 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // 日本語(既定)と英語だけを持ち、端末の言語に従う。ライブラリのほかの言語の文言は入れない。
+    androidResources {
+        localeFilters += listOf("ja", "en")
+    }
 }
 
 dependencies {

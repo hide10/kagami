@@ -1,4 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 日本語が正本。values-en/strings.xml は同じ名前をすべて持つ(StringsTest で確かめる)。 -->
 <resources>
-    <string name="app_name">鏡</string>
+    <string name="app_name">鏡ミラー</string>
+
+    <string name="camera_permission_reason">鏡として映すためにカメラを使います。映像は保存も送信もしません。</string>
+    <string name="camera_permission_allow">カメラを許可する</string>
+    <string name="no_front_camera">前面カメラが見つかりません</string>
+
+    <string name="button_light">ライト</string>
+    <string name="button_pause">静止</string>
+    <string name="button_color">色・明るさ</string>
+    <string name="button_info">情報</string>
+    <string name="zoom_track">上下になぞって拡大・縮小</string>
+
+    <string name="part_all">全体</string>
+    <string name="part_left_eye">左目</string>
+    <string name="part_right_eye">右目</string>
+    <string name="part_nose">鼻</string>
+    <string name="part_mouth">口</string>
+
+    <string name="exposure">明るさ</string>
+    <string name="color_temperature">色温度</string>
+    <string name="reset">元に戻す</string>
+    <string name="light_mode">光り方</string>
+    <string name="light_mode_band">縁</string>
+    <string name="light_mode_shrink">縮小</string>
+    <string name="light_amount">光の量</string>
+    <string name="exposure_value" translatable="false">%1$+.1f EV</string>
+    <string name="kelvin_value" translatable="false">%1$dK</string>
+    <string name="percent_value" translatable="false">%1$d%%</string>
+
+    <string name="help_title">使い方</string>
+    <string name="close">閉じる</string>
+    <string name="hint_focus">ピント調整</string>
+    <string name="hint_light">ライト オン・オフ</string>
+    <string name="hint_pause">一時停止</string>
+    <string name="hint_zoom">ズーム</string>
+    <string name="hint_exposure">露出</string>
+    <string name="hint_full_screen">全面モード</string>
+
+    <string name="gesture_tap">タップ</string>
+    <string name="gesture_double_tap">ダブルタップ</string>
+    <string name="gesture_long_press">長押し</string>
+    <string name="gesture_edge_drag">右端の上下ドラッグ</string>
+    <string name="gesture_pinch">ピンチ</string>
+    <string name="gesture_two_finger_vertical">2本指の上下ドラッグ</string>
+    <string name="gesture_two_finger_horizontal">2本指の水平ドラッグ</string>
+    <string name="gesture_two_finger_tap">2本指タップ</string>
 </resources>
