@@ -60,16 +60,19 @@ data class ColorAdjust(val exposureEv: Float = 0f, val kelvin: Float = Kelvin.NE
     }
 }
 
-/** 画面ライト。画面を光らせて顔を照らす。 */
-data class ScreenLight(val on: Boolean = false, val brightness: Float = 1f, val kelvin: Float = 5000f) {
-    /** いちばん強いチャンネルが brightness になる色。 */
+/** 画面ライト。画面のふちを帯状に光らせて顔を照らす。光の量は帯の太さ(dp)で決め、色は暗くしない。 */
+data class ScreenLight(val on: Boolean = false, val thicknessDp: Float = 64f, val kelvin: Float = 5000f) {
+    /** 4dp 刻みに丸め、範囲の外へは出さない。 */
+    fun withThickness(dp: Float) = copy(thicknessDp = (dp.coerceIn(THICKNESS_DP) / 4f).roundToInt() * 4f)
+
+    /** 色温度の色を、いちばん強いチャンネルが 1 になるまで明るくしたもの。 */
     fun color(): Rgb {
         val c = Kelvin.rgb(kelvin)
-        return c * (brightness / c.max)
+        return c * (1f / c.max)
     }
 
     companion object {
-        val BRIGHTNESS = 0.1f..1f
+        val THICKNESS_DP = 16f..120f
         val KELVIN = 2700f..8000f
     }
 }

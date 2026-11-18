@@ -73,7 +73,27 @@ class ColorAdjustTest {
     }
 
     @Test
-    fun lightBrightnessScalesTheStrongestChannel() {
-        assertEquals(0.4f, ScreenLight(brightness = 0.4f, kelvin = 4000f).color().max, 1e-6f)
+    fun lightColorIsAlwaysFullIntensity() {
+        for (k in listOf(2700f, 4000f, 6500f, 8000f)) {
+            val c = ScreenLight(thicknessDp = 16f, kelvin = k).color()
+            assertEquals("$k", 1f, c.max, 1e-6f)
+        }
+    }
+
+    @Test
+    fun lightColorFollowsKelvin() {
+        val warm = ScreenLight(kelvin = 2700f).color()
+        val cool = ScreenLight(kelvin = 8000f).color()
+        assertTrue("$warm $cool", cool.b > warm.b && cool.g > warm.g)
+        assertEquals(1f, cool.b, 1e-6f)
+    }
+
+    @Test
+    fun lightThicknessStaysInRangeAndSnapsToFourDp() {
+        assertEquals(120f, ScreenLight().withThickness(500f).thicknessDp, 0f)
+        assertEquals(16f, ScreenLight().withThickness(0f).thicknessDp, 0f)
+        assertEquals(48f, ScreenLight().withThickness(49.9f).thicknessDp, 0f)
+        assertEquals(52f, ScreenLight().withThickness(50.1f).thicknessDp, 0f)
+        assertTrue(ScreenLight().thicknessDp in ScreenLight.THICKNESS_DP)
     }
 }

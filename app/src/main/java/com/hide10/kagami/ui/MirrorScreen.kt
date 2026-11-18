@@ -123,7 +123,7 @@ private fun LightFrame(light: ScreenLight) {
     val c = light.color()
     Box(
         Modifier.fillMaxSize().drawBehind {
-            val width = 72.dp.toPx()
+            val width = light.thicknessDp.dp.toPx()
             inset(width / 2) { drawRect(Color(c.r, c.g, c.b), style = Stroke(width)) }
         },
     )
@@ -207,9 +207,9 @@ private fun LightPanel(light: ScreenLight, vm: MirrorViewModel) {
             Text("点灯", Modifier.weight(1f))
             Switch(light.on, { on -> vm.adjustLight { it.copy(on = on) } })
         }
-        val percent = (light.brightness * 100).roundToInt()
-        SliderRow("明るさ", "$percent%", light.brightness, ScreenLight.BRIGHTNESS, enabled = light.on) { v ->
-            vm.adjustLight { it.copy(brightness = v) }
+        val percent = (light.thicknessDp / ScreenLight.THICKNESS_DP.endInclusive * 100).roundToInt()
+        SliderRow("光の量", "$percent%", light.thicknessDp, ScreenLight.THICKNESS_DP, enabled = light.on) { v ->
+            vm.adjustLight { it.withThickness(v) }
         }
         SliderRow("色温度", kelvinLabel(light.kelvin), light.kelvin, ScreenLight.KELVIN, enabled = light.on) { v ->
             vm.adjustLight { it.copy(kelvin = v) }
