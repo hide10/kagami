@@ -129,6 +129,9 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { goLive() }
 
+    var help by remember { mutableStateOf(false) }
+    if (help) HelpDialog { help = false }
+
     val haptics = LocalHapticFeedback.current
     val light = state.light
     if (light.on) FullBrightness()
@@ -223,7 +226,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
         }
         if (light.glows(LightMode.BAND)) LightBand(light, glow)
         Column(Modifier.fillMaxSize()) {
-            FunctionRow(state, vm, onFreeze = ::toggleFreeze)
+            FunctionRow(state, vm, helping = help, onFreeze = ::toggleFreeze, onHelp = { help = true })
             // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。
             Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
                 ZoomTrack(
@@ -387,7 +390,7 @@ private val SCRIM = Color.Black.copy(alpha = 0.55f)
 
 /** 機能のアイコン。ステータスバーと切り欠きの下に、右へ寄せて並べる。 */
 @Composable
-private fun FunctionRow(state: MirrorState, vm: MirrorViewModel, onFreeze: () -> Unit) {
+private fun FunctionRow(state: MirrorState, vm: MirrorViewModel, helping: Boolean, onFreeze: () -> Unit, onHelp: () -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
@@ -403,6 +406,7 @@ private fun FunctionRow(state: MirrorState, vm: MirrorViewModel, onFreeze: () ->
                 GlyphButton("静止", selected = state.frozen, onClick = onFreeze) { pauseGlyph(state.frozen) }
                 val coloring = state.panel == Panel.COLOR
                 GlyphButton("色・明るさ", selected = coloring, onClick = { vm.toggle(Panel.COLOR) }) { slidersGlyph(coloring) }
+                GlyphButton("情報", selected = helping, onClick = onHelp) { infoGlyph(helping) }
             }
         }
     }

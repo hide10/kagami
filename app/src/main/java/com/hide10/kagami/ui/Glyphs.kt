@@ -59,6 +59,14 @@ internal fun DrawScope.pauseGlyph(active: Boolean) = grid {
     for (x in listOf(6.5f, 13.5f)) drawRoundRect(if (active) ACCENT else INK, Offset(x, 5f), Size(4f, 14f), CornerRadius(1f))
 }
 
+/** 丸の中の i。 */
+internal fun DrawScope.infoGlyph(active: Boolean) = grid {
+    val c = if (active) ACCENT else INK
+    drawCircle(c, 9f, Offset(12f, 12f), style = Stroke(1.8f))
+    drawCircle(c, 1.3f, Offset(12f, 7.7f))
+    drawLine(c, Offset(12f, 11f), Offset(12f, 16.8f), 2f, StrokeCap.Round)
+}
+
 /** つまみの付いた 3 本のスライダー。 */
 internal fun DrawScope.slidersGlyph(active: Boolean) = grid {
     val c = if (active) ACCENT else INK
