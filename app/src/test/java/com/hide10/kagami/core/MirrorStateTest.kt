@@ -236,4 +236,47 @@ class MirrorStateTest {
         assertEquals(LightMode.SHRINK, again.toggle(Panel.COLOR).toggle(Panel.COLOR).light.mode)
         assertEquals(1f, again.toggleLight().light.previewScale, 0f)
     }
+
+    @Test
+    fun fullScreenComesAndGoesWithoutChangingAnythingElse() {
+        val s = MirrorState(target = dragged, color = ColorAdjust(exposureEv = 1f), light = ScreenLight(on = true), panel = Panel.COLOR)
+            .freeze(Crop(540f, 960f, 2f), PHONE)
+        val full = s.toggleFullScreen()
+        assertTrue(full.fullScreen)
+        assertTrue(full.frozen)
+        assertEquals(s.copy(fullScreen = true), full)
+        assertEquals(s, full.toggleFullScreen())
+    }
+
+    @Test
+    fun inFullScreenOnlyTheTwoFingerTapGetsThrough() {
+        val full = MirrorState().toggleFullScreen()
+        assertTrue(full.allows(Gesture.TwoFingerTap))
+        assertTrue(MirrorState().allows(Gesture.TwoFingerTap))
+        for (g in listOf(Gesture.Tap(Pt(1f, 2f)), Gesture.LongPress, Gesture.Move(Pt(0f, 0f), Pt(5f, 5f), 1.2f))) {
+            assertFalse("$g", full.allows(g))
+            assertTrue("$g", MirrorState().allows(g))
+        }
+    }
+
+    @Test
+    fun aShrinkingLightGlowsAtTheEdgesInFullScreenAndShrinksAgainAfter() {
+        val shrink = MirrorState(light = ScreenLight(on = true, thicknessDp = 120f, mode = LightMode.SHRINK))
+        assertEquals(LightMode.SHRINK, shrink.glowing)
+        assertEquals(0.6f, shrink.previewScale, 1e-6f)
+        val full = shrink.toggleFullScreen()
+        assertEquals(LightMode.BAND, full.glowing)
+        assertEquals(1f, full.previewScale, 0f)
+        assertEquals(LightMode.SHRINK, full.light.mode)
+        assertEquals(shrink, full.toggleFullScreen())
+    }
+
+    @Test
+    fun fullScreenKeepsTheBandLightAndNothingGlowsWhileTheLightIsOff() {
+        assertEquals(LightMode.BAND, MirrorState(light = ScreenLight(on = true)).toggleFullScreen().glowing)
+        assertNull(MirrorState().toggleFullScreen().glowing)
+        val off = MirrorState(light = ScreenLight(thicknessDp = 120f, mode = LightMode.SHRINK))
+        assertNull(off.glowing)
+        assertEquals(1f, off.previewScale, 0f)
+    }
 }

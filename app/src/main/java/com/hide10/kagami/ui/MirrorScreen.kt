@@ -2,6 +2,7 @@ package com.hide10.kagami.ui
 
 import android.app.Activity
 import android.graphics.Paint
+import android.os.SystemClock
 import android.view.View
 import android.view.WindowManager
 import androidx.camera.core.ImageAnalysis
@@ -15,8 +16,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,10 +77,12 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -93,6 +94,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -107,6 +111,8 @@ import com.hide10.kagami.core.Crop
 import com.hide10.kagami.core.CropPlanner
 import com.hide10.kagami.core.CropSmoother
 import com.hide10.kagami.core.FacePart
+import com.hide10.kagami.core.Finger
+import com.hide10.kagami.core.Gesture
 import com.hide10.kagami.core.ImageMapping
 import com.hide10.kagami.core.LightMode
 import com.hide10.kagami.core.MirrorState
@@ -117,6 +123,8 @@ import com.hide10.kagami.core.SensorMapping
 import com.hide10.kagami.core.SensorRect
 import com.hide10.kagami.core.SensorSpec
 import com.hide10.kagami.core.Size
+import com.hide10.kagami.core.TouchReader
+import com.hide10.kagami.core.TouchRules
 import com.hide10.kagami.core.ZoomStrip
 import kotlin.math.roundToInt
 
@@ -147,9 +155,11 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     val haptics = LocalHapticFeedback.current
     val light = state.light
     if (light.on) FullBrightness()
-    val cardScale by animateFloatAsState(light.previewScale, label = "card")
+    if (state.fullScreen) HideSystemBars()
+    val cardScale by animateFloatAsState(state.previewScale, label = "card")
     val glow = light.color().let { Color(it.r, it.g, it.b) }
-    BoxWithConstraints(Modifier.fillMaxSize().background(if (light.glows(LightMode.SHRINK)) glow else Color.Black)) {
+    // 周りが見えるのは縮小のときだけだが、全面の出入りでカードが伸び縮みするあいだも光って見えるよう、点いていれば光の色を敷く。
+    BoxWithConstraints(Modifier.fillMaxSize().background(if (light.on) glow else Color.Black)) {
         val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         // crop は見せている切り出しで、唯一の正。カメラはその上限までを切り出し、layer は実際に切り出された一枚に残りの拡大をかける。
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
@@ -202,6 +212,29 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                 }
             }
         }
+        fun onGesture(g: Gesture) {
+            val s = vm.state.value
+            if (!s.allows(g)) return
+            when (g) {
+                is Gesture.Tap -> {
+                    // 寄るのと同じ点にピントと露出を合わせる。止めた一枚はカメラの今の映像ではないので合わせない。
+                    if (!s.frozen) {
+                        val seen = crop.toSource(g.at, size)
+                        if (focus.at(seen, frame.mapping, crop.zoom)) focused = FocusMark(seen)
+                    }
+                    vm.moveTo(CropPlanner.tap(g.at, crop, size, s.extent(size)))
+                }
+                Gesture.LongPress -> {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    toggleFreeze()
+                }
+                Gesture.TwoFingerTap -> vm.toggleFullScreen()
+                is Gesture.Move -> {
+                    crop = CropPlanner.transform(crop, g.centroid, g.pan, g.zoom, size, s.extent(size))
+                    vm.moveTo(crop)
+                }
+            }
+        }
         // 縮小のライトでは、この入れ物ごと角の丸いカードに縮めて周りを光らせる。graphicsLayer はレイアウトの大きさを変えず、
         // 中の指の座標も縮める前のこの入れ物の座標で届くので、切り出しとジェスチャーの計算はそのまま使える。
         Box(
@@ -219,35 +252,10 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             // その範囲を still として覚え、残りの拡大と色をかければ止めた瞬間と同じに見える。
             still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
             FocusRing(focused, { crop }, size)
-            Box(
-                Modifier.fillMaxSize()
-                    .pointerInput(size) {
-                        // 指がタッチスロップを越えて動くと次の detectTransformGestures がその動きを消費し、長押しは取り消される。
-                        detectTapGestures(
-                            onLongPress = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                toggleFreeze()
-                            },
-                        ) {
-                            val tap = Pt(it.x, it.y)
-                            // 寄るのと同じ点にピントと露出を合わせる。止めた一枚はカメラの今の映像ではないので合わせない。
-                            if (!vm.state.value.frozen) {
-                                val seen = crop.toSource(tap, size)
-                                if (focus.at(seen, frame.mapping, crop.zoom)) focused = FocusMark(seen)
-                            }
-                            vm.moveTo(CropPlanner.tap(tap, crop, size, vm.state.value.extent(size)))
-                        }
-                    }
-                    .pointerInput(size) {
-                        detectTransformGestures { centroid, pan, zoom, _ ->
-                            crop = CropPlanner.transform(crop, Pt(centroid.x, centroid.y), Pt(pan.x, pan.y), zoom, size, vm.state.value.extent(size))
-                            vm.moveTo(crop)
-                        }
-                    },
-            )
+            Box(Modifier.fillMaxSize().pointerInput(size) { readTouches(::onGesture) })
         }
-        if (light.glows(LightMode.BAND)) LightBand(light, glow)
-        Column(Modifier.fillMaxSize()) {
+        if (state.glowing == LightMode.BAND) LightBand(light, glow)
+        if (!state.fullScreen) Column(Modifier.fillMaxSize()) {
             FunctionRow(state, vm, helping = help, onFreeze = ::toggleFreeze, onHelp = { help = true })
             // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。戻るジェスチャーの幅だけ内側へ寄せる。
             val edge = WindowInsets.safeDrawing.union(WindowInsets.systemGestures).only(WindowInsetsSides.Horizontal)
@@ -351,6 +359,45 @@ private fun FullBrightness() {
         window.attributes = window.attributes.apply { screenBrightness = 1f }
         onDispose {
             window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        }
+    }
+}
+
+/** 全面のあいだはステータスバーとナビゲーションバーを隠し、端からなぞったときだけ一時的に出す。抜ければ戻す。 */
+@Composable
+private fun HideSystemBars() {
+    val view = LocalView.current
+    val bars = remember(view) { WindowCompat.getInsetsController((view.context as Activity).window, view) }
+    fun hide() {
+        bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        bars.hide(WindowInsetsCompat.Type.systemBars())
+    }
+    DisposableEffect(bars) {
+        hide()
+        onDispose { bars.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+    // 古い端末はほかのアプリへ移るとバーを出し直すので、戻ってきたら隠し直す。
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hide() }
+}
+
+/** 届いた指を TouchReader で読み分けて onGesture へ渡す。長押しは次の動きを待たず、決まる時刻に渡す。 */
+private suspend fun PointerInputScope.readTouches(onGesture: (Gesture) -> Unit) {
+    val reader = TouchReader(TouchRules(viewConfiguration.touchSlop, viewConfiguration.longPressTimeoutMillis))
+    awaitPointerEventScope {
+        while (true) {
+            val wait = reader.deadline?.minus(SystemClock.uptimeMillis())
+            val event = when {
+                wait == null -> awaitPointerEvent()
+                wait > 0 -> withTimeoutOrNull(wait) { awaitPointerEvent() }
+                else -> null
+            }
+            val g = if (event == null) {
+                reader.tick(SystemClock.uptimeMillis())
+            } else {
+                val time = event.changes.firstOrNull()?.uptimeMillis ?: continue
+                reader.read(time, event.changes.map { Finger(it.id.value, Pt(it.position.x, it.position.y), it.pressed) })
+            }
+            g?.let(onGesture)
         }
     }
 }

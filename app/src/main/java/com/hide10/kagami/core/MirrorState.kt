@@ -7,6 +7,7 @@ enum class Panel { COLOR, LIGHT }
  * pendingPart は押された部位ボタンで、顔が見つかったときに一度だけ寄る。
  * still は止めた一枚を映しているあいだ、その一枚にカメラが切り出していた範囲(ビュー座標)。止めているあいだはその範囲が全体になる。
  * 部位はカメラの今の顔で決めるので、止めているあいだは寄れない。
+ * fullScreen は全面鏡モードで、映像だけを画面いっぱいに映し、2 本指タップのほかの操作は受け付けない。
  */
 data class MirrorState(
     val target: Crop? = null,
@@ -15,8 +16,25 @@ data class MirrorState(
     val color: ColorAdjust = ColorAdjust(),
     val light: ScreenLight = ScreenLight(),
     val panel: Panel? = null,
+    val fullScreen: Boolean = false,
 ) {
     val frozen get() = still != null
+
+    /** 入るのも抜けるのも 2 本指タップ。ほかの状態は変えないので、抜ければ元の画面に戻る。 */
+    fun toggleFullScreen() = copy(fullScreen = !fullScreen)
+
+    fun allows(g: Gesture) = !fullScreen || g == Gesture.TwoFingerTap
+
+    /** 画面を光らせている光らせ方。消えていれば null。全面では縮小でも映像を画面いっぱいに保ち、同じ光の量の縁で光らせる。 */
+    val glowing: LightMode?
+        get() = when {
+            !light.on -> null
+            fullScreen -> LightMode.BAND
+            else -> light.mode
+        }
+
+    /** プレビューを映す大きさ(画面に対する比)。縮小で光らせているときだけ 1 より小さい。 */
+    val previewScale get() = if (glowing == LightMode.SHRINK) light.previewScale else 1f
 
     /** 見せられるいちばん広い範囲。止めているあいだは止めた一枚の範囲、ほかはカメラの全体。 */
     fun extent(size: Size) = still ?: Crop.full(size)

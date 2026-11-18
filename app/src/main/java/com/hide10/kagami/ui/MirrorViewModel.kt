@@ -38,6 +38,8 @@ class MirrorViewModel : ViewModel() {
 
     fun toggleLight() = _state.update { it.toggleLight() }
 
+    fun toggleFullScreen() = _state.update { it.toggleFullScreen() }
+
     fun adjustColor(change: (ColorAdjust) -> ColorAdjust) = _state.update { it.copy(color = change(it.color)) }
 
     fun adjustLight(change: (ScreenLight) -> ScreenLight) = _state.update { it.copy(light = change(it.light)) }
