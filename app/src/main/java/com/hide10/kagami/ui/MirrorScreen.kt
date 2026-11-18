@@ -39,9 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -110,7 +110,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     }
 }
 
-/** 画面のふちを光らせて顔を照らす。出ているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。 */
+/** 画面のふちを光らせて顔を照らす。帯は外側が塗りつぶしで、内側へ向かって帯の太さちょうどで消える。出ているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。 */
 @Composable
 private fun LightFrame(light: ScreenLight) {
     val window = (LocalContext.current as Activity).window
@@ -121,10 +121,16 @@ private fun LightFrame(light: ScreenLight) {
         }
     }
     val c = light.color()
+    val fade = listOf(Color(c.r, c.g, c.b), Color(c.r, c.g, c.b, alpha = 0f))
     Box(
         Modifier.fillMaxSize().drawBehind {
-            val width = light.thicknessDp.dp.toPx()
-            inset(width / 2) { drawRect(Color(c.r, c.g, c.b), style = Stroke(width)) }
+            val t = light.thicknessDp.dp.toPx()
+            val w = size.width
+            val h = size.height
+            drawRect(Brush.verticalGradient(fade, 0f, t), size = size.copy(height = t))
+            drawRect(Brush.verticalGradient(fade, h, h - t), Offset(0f, h - t), size.copy(height = t))
+            drawRect(Brush.horizontalGradient(fade, 0f, t), size = size.copy(width = t))
+            drawRect(Brush.horizontalGradient(fade, w, w - t), Offset(w - t, 0f), size.copy(width = t))
         },
     )
 }
