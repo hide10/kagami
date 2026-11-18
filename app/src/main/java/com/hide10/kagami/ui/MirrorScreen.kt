@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,6 +60,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hide10.kagami.camera.CameraCrop
 import com.hide10.kagami.camera.FaceAnalyzer
 import com.hide10.kagami.camera.runFrontCamera
 import com.hide10.kagami.core.ColorAdjust
@@ -71,16 +73,23 @@ import com.hide10.kagami.core.MirrorState
 import com.hide10.kagami.core.Panel
 import com.hide10.kagami.core.Pt
 import com.hide10.kagami.core.ScreenLight
+import com.hide10.kagami.core.SensorMapping
+import com.hide10.kagami.core.SensorRect
+import com.hide10.kagami.core.SensorSpec
 import com.hide10.kagami.core.Size
 import kotlin.math.roundToInt
 
 @Composable
 fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val faces = remember { FaceAnalyzer() }
+    val camera = remember { CameraCrop() }
+    val faces = remember { FaceAnalyzer(camera) }
     DisposableEffect(faces) { onDispose { faces.close() } }
     val context = LocalContext.current
     val preview = remember { PreviewView(context).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
+
+    // 押した部位ボタンの通し番号。最後に押したものの結果だけを使う。
+    var presses by remember { mutableIntStateOf(0) }
 
     // 止めた一枚。メモリにだけ置き、保存も共有もしない。カメラはつないだままなので、ライブへはすぐ戻れる。
     var still by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -93,6 +102,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         var crop by remember(size) { mutableStateOf(Crop.full(size)) }
+        val frame = remember(size) { CameraFrame(size) }
         LaunchedEffect(size) {
             // 切り出しはこの大きさのビュー座標なので、大きさが変わったら全体から始める。
             vm.showAll()
@@ -101,6 +111,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
                 val s = vm.state.value
                 crop = CropSmoother.step(crop, s.target ?: s.extent(size), (now - last) / 1e9f)
                 last = now
+                frame.update(camera)
             }
         }
 
@@ -111,7 +122,7 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             translationX = t.translationX
             translationY = t.translationY
         }
-        CameraPreview(preview, state.color, faces, zoomed)
+        CameraPreview(preview, state.color, faces, camera, zoomed)
         // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚。同じ切り出しと色をかければ止めた瞬間と同じに見える。
         still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
         Box(
@@ -130,7 +141,17 @@ fun MirrorScreen(vm: MirrorViewModel = viewModel()) {
             vm,
             onPart = { part ->
                 if (vm.request(part)) {
-                    faces.requestFace { face, image -> vm.faceFound(ImageMapping(image, size, mirror = true).toView(face), size) }
+                    val press = ++presses
+                    val mapping = frame.mapping
+                    faces.requestFace { found ->
+                        if (press != presses) return@requestFace
+                        if (found == null) {
+                            vm.partMissed()
+                        } else {
+                            val shot = found.crop?.let { mapping?.toView(it) } ?: Crop.full(size)
+                            vm.faceFound(ImageMapping(found.image, size, mirror = true, shot).toView(found.face), size)
+                        }
+                    }
                 }
             },
             onFreeze = {
@@ -175,18 +196,46 @@ private fun LightFrame(light: ScreenLight) {
 }
 
 @Composable
-private fun CameraPreview(view: PreviewView, color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, modifier: Modifier) {
+private fun CameraPreview(view: PreviewView, color: ColorAdjust, analyzer: ImageAnalysis.Analyzer, crop: CameraCrop, modifier: Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var noCamera by remember { mutableStateOf(false) }
-    LaunchedEffect(view, analyzer) {
-        runFrontCamera(context, owner, view, analyzer)
+    LaunchedEffect(view, analyzer, crop) {
+        runFrontCamera(context, owner, view, analyzer, crop)
         noCamera = true
     }
     if (noCamera) {
         Box(modifier, Alignment.Center) { Text("前面カメラが見つかりません", color = Color.White) }
     } else {
         AndroidView({ view }, modifier) { it.tint(color) }
+    }
+}
+
+/** この画面の大きさで見たカメラ側の切り出し。毎フレーム update し、ボタンからも読む。 */
+private class CameraFrame(private val size: Size) {
+    private var spec: SensorSpec? = null
+    private var appliedRect: SensorRect? = null
+
+    /** カメラが切り出せないあいだは null。 */
+    var mapping: SensorMapping? = null
+        private set
+
+    /** いちばん新しい一枚にカメラが切り出していた範囲(ビュー座標)。カメラが切り出さないなら全体。 */
+    var applied = Crop.full(size)
+        private set
+
+    fun update(camera: CameraCrop) {
+        val s = camera.spec
+        if (s != spec) {
+            spec = s
+            mapping = s?.let { SensorMapping(it, size) }
+            appliedRect = null
+        }
+        val r = camera.latest
+        if (r !== appliedRect) {
+            appliedRect = r
+            applied = r?.let { mapping?.toView(it) } ?: Crop.full(size)
+        }
     }
 }
 
