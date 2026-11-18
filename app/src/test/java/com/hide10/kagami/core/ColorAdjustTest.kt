@@ -37,6 +37,25 @@ class ColorAdjustTest {
     }
 
     @Test
+    fun slidingBackNearTheMiddleLeavesThePreviewUntouched() {
+        val adjusted = ColorAdjust().withExposure(1.2f).withKelvin(4100f)
+        assertTrue(!adjusted.isNeutral)
+        val back = adjusted.withExposure(-0.1f).withKelvin(6510f)
+        assertTrue("$back", back.isNeutral)
+        assertArrayEquals(identity, back.matrix(), 0f)
+    }
+
+    @Test
+    fun slidersStopAtTheEndsOfTheirRange() {
+        val high = ColorAdjust().withExposure(5f).withKelvin(20000f)
+        assertEquals(2f, high.exposureEv, 0f)
+        assertEquals(10000f, high.kelvin, 0f)
+        val low = ColorAdjust().withExposure(-5f).withKelvin(0f)
+        assertEquals(-2f, low.exposureEv, 0f)
+        assertEquals(3000f, low.kelvin, 0f)
+    }
+
+    @Test
     fun matrixNeverTouchesAlphaOrAddsOffsets() {
         val m = ColorAdjust(exposureEv = 1.3f, kelvin = 4000f).matrix()
         assertEquals(20, m.size)

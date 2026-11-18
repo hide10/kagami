@@ -2,6 +2,7 @@ package com.hide10.kagami.core
 
 import kotlin.math.ln
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 data class Rgb(val r: Float, val g: Float, val b: Float) {
     operator fun times(k: Float) = Rgb(r * k, g * k, b * k)
@@ -36,6 +37,12 @@ object Kelvin {
 data class ColorAdjust(val exposureEv: Float = 0f, val kelvin: Float = Kelvin.NEUTRAL) {
     val isNeutral get() = exposureEv == 0f && kelvin == Kelvin.NEUTRAL
 
+    /** 1/3 段刻みに丸めるので、真ん中付近へ戻せば無加工に戻る。 */
+    fun withExposure(ev: Float) = copy(exposureEv = (ev.coerceIn(EV) * 3f).roundToInt() / 3f)
+
+    /** 100K 刻みに丸めるので、6500K 付近へ戻せば無加工に戻る。 */
+    fun withKelvin(k: Float) = copy(kelvin = (k.coerceIn(KELVIN) / 100f).roundToInt() * 100f)
+
     /** android.graphics.ColorMatrix と同じ 4x5 行優先の配列。 */
     fun matrix(): FloatArray {
         val g = Kelvin.gain(kelvin) * 2f.pow(exposureEv)
@@ -46,6 +53,11 @@ data class ColorAdjust(val exposureEv: Float = 0f, val kelvin: Float = Kelvin.NE
             0f, 0f, 0f, 1f, 0f,
         )
     }
+
+    companion object {
+        val EV = -2f..2f
+        val KELVIN = 3000f..10000f
+    }
 }
 
 /** 画面ライト。画面を光らせて顔を照らす。 */
@@ -54,5 +66,10 @@ data class ScreenLight(val on: Boolean = false, val brightness: Float = 1f, val 
     fun color(): Rgb {
         val c = Kelvin.rgb(kelvin)
         return c * (brightness / c.max)
+    }
+
+    companion object {
+        val BRIGHTNESS = 0.1f..1f
+        val KELVIN = 2700f..8000f
     }
 }
