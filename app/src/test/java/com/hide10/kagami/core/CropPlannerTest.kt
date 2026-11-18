@@ -18,8 +18,39 @@ class CropPlannerTest {
         for ((part, landmark) in expected) {
             val crop = CropPlanner.zoomOnPart(part, f, PHONE)
             assertPt(PHONE.center, screenOf(landmark, crop, PHONE))
-            assertEquals(part.eyeFrac * PHONE.w / 250f, crop.zoom, 1e-3f)
         }
+    }
+
+    @Test
+    fun eyesAndNoseShowTheEyeDistanceAtTheirShareOfTheScreen() {
+        val f = face(Pt(540f, 900f), 250f)
+        for ((part, share) in listOf(FacePart.LEFT_EYE to 1.1f, FacePart.RIGHT_EYE to 1.1f, FacePart.NOSE to 0.9f)) {
+            val shown = f.eyeDist * CropPlanner.zoomOnPart(part, f, PHONE).zoom
+            assertEquals("$part", share * PHONE.w, shown, 0.1f)
+        }
+    }
+
+    /** 口の両端の間隔を両目の 0.8 倍として、画面に映る口の幅。 */
+    private fun mouthShown(f: FaceLandmarks) = 0.8f * f.eyeDist * CropPlanner.zoomOnPart(FacePart.MOUTH, f, PHONE).zoom
+
+    @Test
+    fun theMouthNearlyFillsTheWidthAndIsTheClosestPart() {
+        val f = face(Pt(540f, 900f), 250f)
+        assertEquals(0.9f * PHONE.w, mouthShown(f), 0.5f)
+        val zoom = FacePart.entries.associateWith { CropPlanner.zoomOnPart(it, f, PHONE).zoom }
+        assertTrue("$zoom", zoom.getValue(FacePart.MOUTH) > zoom.getValue(FacePart.LEFT_EYE))
+        assertTrue("$zoom", zoom.getValue(FacePart.LEFT_EYE) > zoom.getValue(FacePart.NOSE))
+    }
+
+    @Test
+    fun theMouthStopsShortOfTheWidthOnlyWhenTheFaceIsFarAway() {
+        // 10 倍で 9 割に届くのは、両目が画面幅の 0.9 / 0.8 / 10 = 11.25% 以上に映るとき。
+        for (eyeShare in listOf(0.12f, 0.2f, 0.3f, 0.45f)) {
+            assertEquals("$eyeShare", 0.9f * PHONE.w, mouthShown(face(PHONE.center, eyeShare * PHONE.w)), 0.5f)
+        }
+        val far = face(PHONE.center, 0.08f * PHONE.w)
+        assertEquals(10f, CropPlanner.zoomOnPart(FacePart.MOUTH, far, PHONE).zoom)
+        assertEquals(0.64f * PHONE.w, mouthShown(far), 0.5f)
     }
 
     /** 前面カメラの像はミラーで左右が入れ替わり、leftEye が画面の右に来る。 */
