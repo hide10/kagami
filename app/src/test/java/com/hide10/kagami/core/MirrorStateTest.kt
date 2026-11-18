@@ -71,4 +71,34 @@ class MirrorStateTest {
     fun pressingTheOtherPanelSwitchesToIt() {
         assertEquals(Panel.LIGHT, MirrorState().toggle(Panel.COLOR).toggle(Panel.LIGHT).panel)
     }
+
+    @Test
+    fun theLightTurnsOnAndOffWithoutOpeningOrClosingAPanel() {
+        val on = MirrorState().toggleLight()
+        assertTrue(on.light.on)
+        assertNull(on.panel)
+        assertFalse(on.toggleLight().light.on)
+
+        val withPanel = MirrorState().toggle(Panel.LIGHT)
+        assertEquals(Panel.LIGHT, withPanel.toggleLight().panel)
+        assertEquals(Panel.LIGHT, withPanel.toggleLight().toggleLight().panel)
+    }
+
+    @Test
+    fun theLightPanelOpensAndClosesWithoutSwitchingTheLight() {
+        assertFalse(MirrorState().toggle(Panel.LIGHT).light.on)
+        val lit = MirrorState().toggleLight()
+        assertTrue(lit.toggle(Panel.LIGHT).light.on)
+        assertTrue(lit.toggle(Panel.LIGHT).toggle(Panel.LIGHT).light.on)
+        assertTrue(lit.toggle(Panel.COLOR).light.on)
+    }
+
+    @Test
+    fun theLightKeepsItsAmountAndColorAcrossOffAndOn() {
+        val set = MirrorState(light = ScreenLight(thicknessDp = 100f, kelvin = 3000f))
+        val again = set.toggleLight().toggleLight().toggleLight()
+        assertTrue(again.light.on)
+        assertEquals(100f, again.light.thicknessDp, 0f)
+        assertEquals(3000f, again.light.kelvin, 0f)
+    }
 }

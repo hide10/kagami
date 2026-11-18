@@ -15,6 +15,9 @@ data class MirrorState(
 ) {
     fun toggle(p: Panel) = copy(panel = p.takeUnless { it == panel })
 
+    /** ライトの点灯と消灯だけを切り替える。光の量と色温度、開いているパネルはそのまま。 */
+    fun toggleLight() = copy(light = light.copy(on = !light.on))
+
     fun showAll() = copy(target = null, pendingPart = null)
 
     /** タップや指で決めた切り出し。押したばかりの部位ボタンは取り消す。 */
