@@ -18,6 +18,7 @@ class MirrorStateTest {
         assertFalse(s.frozen)
         assertTrue(s.color.isNeutral)
         assertFalse(s.light.on)
+        assertEquals(LightMode.BAND, s.light.mode)
         assertNull(s.panel)
     }
 
@@ -187,5 +188,15 @@ class MirrorStateTest {
         assertTrue(again.light.on)
         assertEquals(100f, again.light.thicknessDp, 0f)
         assertEquals(3000f, again.light.kelvin, 0f)
+    }
+
+    @Test
+    fun theLightKeepsItsModeAcrossOffOnAndThePanels() {
+        val shrink = MirrorState(light = ScreenLight(mode = LightMode.SHRINK))
+        val again = shrink.toggleLight().toggle(Panel.LIGHT).toggleLight().toggle(Panel.LIGHT).toggleLight()
+        assertTrue(again.light.on)
+        assertEquals(LightMode.SHRINK, again.light.mode)
+        assertEquals(LightMode.SHRINK, again.toggle(Panel.COLOR).toggle(Panel.COLOR).light.mode)
+        assertEquals(1f, again.toggleLight().light.previewScale, 0f)
     }
 }

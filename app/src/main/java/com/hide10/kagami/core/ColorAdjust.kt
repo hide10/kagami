@@ -60,8 +60,19 @@ data class ColorAdjust(val exposureEv: Float = 0f, val kelvin: Float = Kelvin.NE
     }
 }
 
-/** 画面ライト。画面のふちを帯状に光らせて顔を照らす。光の量は帯の太さ(dp)で決め、色は暗くしない。 */
-data class ScreenLight(val on: Boolean = false, val thicknessDp: Float = 64f, val kelvin: Float = 5000f) {
+/** 画面ライトの光らせ方。BAND は画面のふちを帯で光らせ、SHRINK はプレビューを角の丸いカードに縮めてその周りを光らせる。 */
+enum class LightMode { BAND, SHRINK }
+
+/**
+ * 画面ライト。光の量はひとつのスライダー(thicknessDp)で決め、BAND では帯の太さ、SHRINK ではカードの小ささになる。色は暗くしない。
+ * 光らせ方は点けても消しても変わらない。
+ */
+data class ScreenLight(
+    val on: Boolean = false,
+    val thicknessDp: Float = 64f,
+    val kelvin: Float = 5000f,
+    val mode: LightMode = LightMode.BAND,
+) {
     /** 4dp 刻みに丸め、範囲の外へは出さない。 */
     fun withThickness(dp: Float) = copy(thicknessDp = (dp.coerceIn(THICKNESS_DP) / 4f).roundToInt() * 4f)
 
@@ -71,8 +82,20 @@ data class ScreenLight(val on: Boolean = false, val thicknessDp: Float = 64f, va
         return c * (1f / c.max)
     }
 
+    fun glows(m: LightMode) = on && mode == m
+
+    /** プレビューを映す大きさ(画面に対する比)。SHRINK で光っているときだけ、光の量が最小で 0.95、最大で 0.6 になるよう比例して縮める。 */
+    val previewScale: Float
+        get() {
+            if (!glows(LightMode.SHRINK)) return 1f
+            val amount = (thicknessDp - THICKNESS_DP.start) / (THICKNESS_DP.endInclusive - THICKNESS_DP.start)
+            return LARGEST_CARD + (SMALLEST_CARD - LARGEST_CARD) * amount
+        }
+
     companion object {
         val THICKNESS_DP = 16f..120f
         val KELVIN = 2700f..8000f
+        private const val LARGEST_CARD = 0.95f
+        private const val SMALLEST_CARD = 0.6f
     }
 }

@@ -2,6 +2,7 @@ package com.hide10.kagami.core
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -95,5 +96,33 @@ class ColorAdjustTest {
         assertEquals(48f, ScreenLight().withThickness(49.9f).thicknessDp, 0f)
         assertEquals(52f, ScreenLight().withThickness(50.1f).thicknessDp, 0f)
         assertTrue(ScreenLight().thicknessDp in ScreenLight.THICKNESS_DP)
+    }
+
+    @Test
+    fun theShrinkLightMakesThePreviewSmallerTheMoreLightItGives() {
+        val shrink = ScreenLight(on = true, mode = LightMode.SHRINK)
+        assertEquals(0.95f, shrink.withThickness(16f).previewScale, 1e-6f)
+        assertEquals(0.775f, shrink.withThickness(68f).previewScale, 1e-6f)
+        assertEquals(0.6f, shrink.withThickness(120f).previewScale, 1e-6f)
+        val scales = (16..120 step 4).map { shrink.withThickness(it.toFloat()).previewScale }
+        assertTrue("$scales", scales.zipWithNext().all { (a, b) -> b < a })
+    }
+
+    @Test
+    fun onlyTheShrinkLightShrinksThePreview() {
+        assertEquals(1f, ScreenLight(on = false, thicknessDp = 120f, mode = LightMode.SHRINK).previewScale, 0f)
+        assertEquals(1f, ScreenLight(on = true, thicknessDp = 120f, mode = LightMode.BAND).previewScale, 0f)
+    }
+
+    @Test
+    fun eachModeGlowsOnlyWhileTheLightIsOnInThatMode() {
+        val band = ScreenLight(on = true, mode = LightMode.BAND)
+        assertTrue(band.glows(LightMode.BAND))
+        assertFalse(band.glows(LightMode.SHRINK))
+        val shrink = band.copy(mode = LightMode.SHRINK)
+        assertTrue(shrink.glows(LightMode.SHRINK))
+        assertFalse(shrink.glows(LightMode.BAND))
+        assertFalse(band.copy(on = false).glows(LightMode.BAND))
+        assertFalse(shrink.copy(on = false).glows(LightMode.SHRINK))
     }
 }
