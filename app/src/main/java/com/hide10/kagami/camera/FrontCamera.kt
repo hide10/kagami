@@ -25,7 +25,7 @@ import kotlinx.coroutines.awaitCancellation
 /**
  * 前面カメラをプレビューと analyzer につなぎ、キャンセルされるまで保つ。前面カメラが無いときだけ戻る。
  * ImageMapping のためにプレビューと解析を同じ 4:3 にそろえる。
- * 拡大はプレビューを切り出すだけなので、プレビューは 1920x1440 までのいちばん細かい 4:3 にし、端末が持っていればノイズ除去を高品質にする。
+ * 拡大はプレビューを切り出すだけなので、プレビューは 1920x1440 までのいちばん細かい 4:3 にし、端末が持っていればノイズ除去と輪郭強調を高品質にする。
  * CameraX が解析とのあいだで 1920x1440 を保証するのは手ブレ補正の組み合わせだけで、それ以外は 1440x1080 ほどに下がる。
  */
 @OptIn(ExperimentalCamera2Interop::class)
@@ -42,8 +42,14 @@ suspend fun runFrontCamera(
 
     val fourThree = AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
     val stabilized = Preview.getPreviewCapabilities(info).isStabilizationSupported
-    val highQualityNr = hasHighQualityNoiseReduction(
-        Camera2CameraInfo.from(info).getCameraCharacteristic(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES),
+    val characteristics = Camera2CameraInfo.from(info)
+    val highQualityNr = offers(
+        characteristics.getCameraCharacteristic(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES),
+        CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY,
+    )
+    val highQualityEdge = offers(
+        characteristics.getCameraCharacteristic(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES),
+        CameraMetadata.EDGE_MODE_HIGH_QUALITY,
     )
     val previewBuilder = Preview.Builder()
         .setResolutionSelector(
@@ -55,9 +61,12 @@ suspend fun runFrontCamera(
                 .build(),
         )
         .setPreviewStabilizationEnabled(stabilized)
+    val extender = Camera2Interop.Extender(previewBuilder)
     if (highQualityNr) {
-        Camera2Interop.Extender(previewBuilder)
-            .setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY)
+        extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY)
+    }
+    if (highQualityEdge) {
+        extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CameraMetadata.EDGE_MODE_HIGH_QUALITY)
     }
     val preview = previewBuilder.build()
     preview.setSurfaceProvider(view.surfaceProvider)
@@ -78,7 +87,8 @@ suspend fun runFrontCamera(
     Log.i(
         "FrontCamera",
         "preview ${preview.resolutionInfo?.resolution} analysis ${analysis.resolutionInfo?.resolution} " +
-            "stabilization $stabilized noiseReduction ${if (highQualityNr) "HIGH_QUALITY" else "default"}",
+            "stabilization $stabilized noiseReduction ${if (highQualityNr) "HIGH_QUALITY" else "default"} " +
+            "edge ${if (highQualityEdge) "HIGH_QUALITY" else "default"}",
     )
     try {
         awaitCancellation()
@@ -87,6 +97,5 @@ suspend fun runFrontCamera(
     }
 }
 
-/** カメラが持つノイズ除去モードの一覧(取れなければ null)に、高品質が入っているか。 */
-internal fun hasHighQualityNoiseReduction(available: IntArray?) =
-    available?.contains(CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY) == true
+/** カメラが持つモードの一覧(取れなければ null)に mode が入っているか。 */
+internal fun offers(available: IntArray?, mode: Int) = available?.contains(mode) == true
