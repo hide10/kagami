@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- テーマアイコン用の単色の手鏡。枠と柄を塗り、鏡面は薄く塗って光の筋とキラッを抜く。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M50.5,63 H57.5 L59.2,79 A5.2,5.2 0 0 1 48.8,79 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M34.5,43.5 A19.5,21.5 0 1 0 73.5,43.5 A19.5,21.5 0 1 0 34.5,43.5 Z M38.4,43.5 A15.6,17.6 0 1 0 69.6,43.5 A15.6,17.6 0 1 0 38.4,43.5 Z" />
+    <!-- 光の筋は幅 5 の丸い端の帯を輪郭にしたもの。 -->
+    <path
+        android:fillAlpha="0.45"
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M38.4,43.5 A15.6,17.6 0 1 0 69.6,43.5 A15.6,17.6 0 1 0 38.4,43.5 Z M42.23,44.95 L48.23,31.95 A2.5,2.5 0 0 1 52.77,34.05 L46.77,47.05 A2.5,2.5 0 0 1 42.23,44.95 Z M61.5,29.5 Q62.5,33.5 66.5,34.5 Q62.5,35.5 61.5,39.5 Q60.5,35.5 56.5,34.5 Q60.5,33.5 61.5,29.5 Z" />
+</vector>
