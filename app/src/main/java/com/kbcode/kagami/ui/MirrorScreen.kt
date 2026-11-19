@@ -283,6 +283,12 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
         if (state.glowing == LightMode.BAND) LightBand(light, glow)
         // 全面のあいだはボタンと帯とパネルを隠すだけで、プレビューへの指の操作はふだんと同じ。右端の寄り引きの帯も隠す。
         // 見えない帯を残すと、その幅ではタップも長押しもピンチもプレビューへ届かなくなるからで、寄り引きはピンチと 2 本指の上下でできる。
+        // 試用版の文字はスッキリ中も残す(未購入のあいだは左下に出す決まり)。通常時は下の Column の中で、露出の帯の上に出る。
+        if (state.fullScreen && billing.showLogo) {
+            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
+                TrialLogoCorner(Modifier.align(Alignment.BottomStart).padding(bottom = 24.dp))
+            }
+        }
         if (!state.fullScreen) Column(Modifier.fillMaxSize()) {
             FunctionRow(state, vm, helping = help, onFreeze = ::toggleFreeze, onHelp = { help = true })
             // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。戻るジェスチャーの幅の上にも重ね、切り欠きだけ避ける。
@@ -295,14 +301,8 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
                     },
                     Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(TRACK_WIDTH),
                 )
-                // 試用版の文字は露出の帯のすぐ上の左端に置き、左の戻るジェスチャーの幅だけ内側へ寄せる。押せないので、下のプレビューへの指は遮らない。
-                if (billing.showLogo) {
-                    TrialLogo(
-                        Modifier.align(Alignment.BottomStart)
-                            .windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Start))
-                            .padding(start = 8.dp, bottom = 4.dp),
-                    )
-                }
+                // 試用版の文字は露出の帯のすぐ上の左端に置く。スッキリ中は下の Column ごと消えるので、外の層に同じ文字を出す。
+                if (billing.showLogo) TrialLogoCorner(Modifier.align(Alignment.BottomStart))
             }
             ExposureBar(state.color, vm)
             PartBar(state, vm) { part ->
@@ -325,6 +325,12 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
 }
 
 private val CARD = RoundedCornerShape(24.dp)
+
+/** 左端の戻るジェスチャーの幅だけ内側へ寄せた試用版の文字。押せないので、下のプレビューへの指は遮らない。 */
+@Composable
+private fun TrialLogoCorner(modifier: Modifier) = TrialLogo(
+    modifier.windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Start)).padding(start = 8.dp, bottom = 4.dp),
+)
 
 /** 帯の幅で、指で押せる範囲。画面の右端から線の内側へ指 1 本ぶん広げ、戻るジェスチャーの幅より内側から始めても掴める。 */
 private val TRACK_WIDTH = 72.dp
