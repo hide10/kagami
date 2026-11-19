@@ -1,3 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 日本語が正本。values-en/strings.xml は同じ名前をすべて持つ(StringsTest で確かめる)。 -->
 <resources>
-    <string name="app_name">鏡</string>
+    <string name="app_name">鏡ミラー</string>
+
+    <string name="camera_permission_reason">鏡として映すためにカメラを使います。映像は保存も送信もしません。</string>
+    <string name="camera_permission_allow">カメラを許可する</string>
+    <string name="no_front_camera">前面カメラが見つかりません</string>
+    <string name="camera_start_failed">カメラを起動できませんでした</string>
+
+    <string name="button_light">ライト</string>
+    <string name="button_pause">静止</string>
+    <string name="button_info">情報</string>
+    <string name="zoom_track">上下になぞって拡大・縮小</string>
+
+    <string name="part_all">全体</string>
+    <string name="part_left_eye">左目</string>
+    <string name="part_right_eye">右目</string>
+    <string name="part_nose">鼻</string>
+    <string name="part_mouth">口</string>
+
+    <string name="exposure">明るさ</string>
+    <string name="color_temperature">色温度</string>
+    <string name="light_mode">光り方</string>
+    <string name="light_mode_band">縁</string>
+    <string name="light_mode_shrink">縮小</string>
+    <string name="light_amount">光の量</string>
+    <string name="exposure_value" translatable="false">%1$+.1f EV</string>
+    <string name="kelvin_value" translatable="false">%1$dK</string>
+    <string name="percent_value" translatable="false">%1$d%%</string>
+
+    <string name="help_title">使い方</string>
+    <string name="close">閉じる</string>
+    <string name="hint_focus">ピント調整</string>
+    <string name="hint_light">ライト オン・オフ</string>
+    <string name="hint_pause">一時停止</string>
+    <string name="hint_zoom">ズーム</string>
+    <string name="hint_exposure">露出</string>
+    <string name="hint_full_screen">スッキリ</string>
+
+    <string name="gesture_tap">タップ</string>
+    <string name="gesture_long_press">長押し</string>
+    <string name="gesture_pinch">ピンチ（2本指で開く・閉じる）</string>
+    <string name="gesture_two_finger_horizontal">2本指で左右にスライド</string>
+    <string name="gesture_two_finger_tap">2本指でタップ</string>
+    <string name="gesture_three_finger_tap">3本指でタップ</string>
+
+    <string name="logo_trial_label">鏡ミラー 試用版</string>
+    <string name="billing_remove_logo">ロゴを消す</string>
+    <string name="billing_free_features">課金せずとも制限なく使えます。一度だけの課金でロゴを消せます。</string>
+    <string name="billing_owned">購入済み</string>
+    <string name="billing_buy">購入 · %1$s</string>
+    <string name="billing_restore">購入を復元・再確認</string>
+    <string name="billing_nothing_to_restore">復元できる購入はありませんでした</string>
+    <string name="billing_checking">Google Playに確認中です…</string>
+    <string name="billing_purchasing">Google Playで購入手続きを完了してください。</string>
+    <string name="billing_pending">お支払いは保留中です。完了するとロゴが消えます。</string>
+    <string name="billing_acknowledging">購入を承認しています…</string>
+    <string name="billing_canceled">購入をキャンセルしました。無料機能はそのまま使えます。</string>
+    <string name="billing_offline">Google Playに接続できません。保存済みの購入状態はそのまま残ります。復元や確認は、接続してからもう一度お試しください。</string>
+    <string name="billing_unavailable">現在Google Playで購入できません。無料機能はそのまま使えます。</string>
+    <string name="billing_error">購入の確認に失敗しました。再確認してください。無料機能はそのまま使えます。</string>
 </resources>

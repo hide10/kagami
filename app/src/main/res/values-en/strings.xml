@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kagami Mirror</string>
+
+    <string name="camera_permission_reason">The camera is used only as a mirror. Video is never saved or sent.</string>
+    <string name="camera_permission_allow">Allow camera</string>
+    <string name="no_front_camera">No front camera found</string>
+    <string name="camera_start_failed">Couldn\'t start the camera</string>
+
+    <string name="button_light">Light</string>
+    <string name="button_pause">Pause</string>
+    <string name="button_info">Info</string>
+    <string name="zoom_track">Drag up or down to zoom</string>
+
+    <string name="part_all">Full view</string>
+    <string name="part_left_eye">Left eye</string>
+    <string name="part_right_eye">Right eye</string>
+    <string name="part_nose">Nose</string>
+    <string name="part_mouth">Mouth</string>
+
+    <string name="exposure">Exposure</string>
+    <string name="color_temperature">Warmth</string>
+    <string name="light_mode">Style</string>
+    <string name="light_mode_band">Edge</string>
+    <string name="light_mode_shrink">Shrink</string>
+    <string name="light_amount">Amount</string>
+
+    <string name="help_title">How to use</string>
+    <string name="close">Close</string>
+    <string name="hint_focus">Focus</string>
+    <string name="hint_light">Light on/off</string>
+    <string name="hint_pause">Pause</string>
+    <string name="hint_zoom">Zoom</string>
+    <string name="hint_exposure">Exposure</string>
+    <string name="hint_full_screen">Clean</string>
+
+    <string name="gesture_tap">Tap</string>
+    <string name="gesture_long_press">Press and hold</string>
+    <string name="gesture_pinch">Pinch</string>
+    <string name="gesture_two_finger_horizontal">Two fingers, slide left/right</string>
+    <string name="gesture_two_finger_tap">Two-finger tap</string>
+    <string name="gesture_three_finger_tap">Three-finger tap</string>
+
+    <string name="logo_trial_label">Kagami Mirror Trial</string>
+    <string name="billing_remove_logo">Remove logo</string>
+    <string name="billing_free_features">Free to use, with no limits. A one-time purchase removes the logo.</string>
+    <string name="billing_owned">Purchased</string>
+    <string name="billing_buy">Buy · %1$s</string>
+    <string name="billing_restore">Restore purchase</string>
+    <string name="billing_nothing_to_restore">No purchase to restore</string>
+    <string name="billing_checking">Checking Google Play…</string>
+    <string name="billing_purchasing">Finish the purchase in Google Play.</string>
+    <string name="billing_pending">Payment is pending. The logo goes away when it completes.</string>
+    <string name="billing_acknowledging">Confirming your purchase…</string>
+    <string name="billing_canceled">Purchase canceled. All features still work.</string>
+    <string name="billing_offline">Cannot reach Google Play. Your saved purchase is kept. Connect and try again.</string>
+    <string name="billing_unavailable">Not available on Google Play right now. All features still work.</string>
+    <string name="billing_error">Could not check the purchase. Please try again. All features still work.</string>
+</resources>
