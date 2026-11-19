@@ -7,10 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,15 +37,14 @@ private val HINTS = listOf(
     Hint(listOf(GestureIcon.TWO_FINGER_TAP), R.string.hint_full_screen),
 )
 
-private val ICON = 36.dp
+/** 指の数と動きが見分けられる大きさ。 */
+private val ICON = 56.dp
 private val ICON_GAP = 4.dp
 
-/** 絵の列の幅。いちばん多く並ぶ行に合わせ、絵は右に寄せて一言のすぐ隣に置く。 */
-private val ICONS_WIDTH = HINTS.maxOf { it.icons.size }.let { ICON * it + ICON_GAP * (it - 1) }
-
-/** 指の操作を絵と一言で示し、その下にロゴを消す買い切りを置く。外側のタップか「閉じる」で閉じる。 */
+/** 指の操作を絵と一言で示し、その下にロゴを消す買い切りを置く。一言は絵のすぐ右に続ける。外側のタップか「閉じる」で閉じる。 */
 @Composable
 fun HelpDialog(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> Unit, onDismiss: () -> Unit) {
+    val gap = AlertDialogDefaults.containerColor
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.close)) } },
@@ -53,11 +52,11 @@ fun HelpDialog(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> Un
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 for (hint in HINTS) {
-                    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Row(Modifier.width(ICONS_WIDTH), Arrangement.spacedBy(ICON_GAP, Alignment.End)) {
+                    Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(ICON_GAP)) {
                             for (icon in hint.icons) {
                                 val name = stringResource(icon.label)
-                                Canvas(Modifier.size(ICON).semantics { contentDescription = name }) { gestureGlyph(icon) }
+                                Canvas(Modifier.size(ICON).semantics { contentDescription = name }) { gestureGlyph(icon, gap) }
                             }
                         }
                         Text(stringResource(hint.text), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
