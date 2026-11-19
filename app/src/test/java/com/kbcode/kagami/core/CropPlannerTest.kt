@@ -97,29 +97,6 @@ class CropPlannerTest {
     }
 
     @Test
-    fun tapBringsTheTouchedContentToTheCenter() {
-        val shown = Crop(400f, 800f, 2f)
-        val finger = Pt(900f, 300f)
-        val touched = shown.toSource(finger, PHONE)
-        val crop = CropPlanner.tap(finger, shown, PHONE)
-        assertPt(PHONE.center, screenOf(touched, crop, PHONE))
-        assertEquals(CropPlanner.POINT_ZOOM, crop.zoom, 1e-3f)
-    }
-
-    @Test
-    fun tapDoesNotZoomOutWhenAlreadyCloser() {
-        val crop = CropPlanner.tap(PHONE.center, Crop(540f, 960f, 4f), PHONE)
-        assertEquals(4f, crop.zoom, 1e-3f)
-    }
-
-    @Test
-    fun tapNearACornerStaysInsideTheImage() {
-        val crop = CropPlanner.tap(Pt(5f, 5f), Crop.full(PHONE), PHONE)
-        assertShowsOnlyImage(crop, PHONE)
-        assertEquals(CropPlanner.POINT_ZOOM, crop.zoom)
-    }
-
-    @Test
     fun theContentUnderTheFingersFollowsThem() {
         val shown = Crop(540f, 960f, 2f)
         val moves = listOf(
@@ -209,17 +186,13 @@ class CropPlannerTest {
     }
 
     @Test
-    fun whileFrozenGesturesAndTapsNeverLeaveTheFrozenFrame() {
+    fun whileFrozenGesturesNeverLeaveTheFrozenFrame() {
         val rnd = Random(13)
         var crop = frozen
         repeat(2000) {
             val centroid = Pt(rnd.nextFloat() * PHONE.w, rnd.nextFloat() * PHONE.h)
             val pan = Pt(rnd.nextFloat() * 600f - 300f, rnd.nextFloat() * 600f - 300f)
-            crop = if (it % 7 == 0) {
-                CropPlanner.tap(centroid, crop, PHONE, frozen)
-            } else {
-                CropPlanner.transform(crop, centroid, pan, 0.5f + rnd.nextFloat(), PHONE, frozen)
-            }
+            crop = CropPlanner.transform(crop, centroid, pan, 0.5f + rnd.nextFloat(), PHONE, frozen)
             assertShowsOnlyImage(crop.within(frozen, PHONE), PHONE)
         }
     }

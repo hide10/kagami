@@ -235,12 +235,11 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
             val s = vm.state.value
             when (g) {
                 is Gesture.Tap -> {
-                    // 寄るのと同じ点にピントと露出を合わせる。止めた一枚はカメラの今の映像ではないので合わせない。
+                    // タップはピントと露出を合わせるだけで、ズームは動かさない。止めた一枚はカメラの今の映像ではないので合わせない。
                     if (!s.frozen) {
                         val seen = crop.toSource(g.at, size)
                         if (focus.at(seen, frame.mapping, crop.zoom)) focused = FocusMark(seen)
                     }
-                    vm.moveTo(CropPlanner.tap(g.at, crop, size, s.extent(size)))
                 }
                 Gesture.LongPress -> {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
