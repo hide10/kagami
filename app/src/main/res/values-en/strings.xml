@@ -42,7 +42,7 @@
 
     <string name="logo_trial_label">Kagami Mirror Trial</string>
     <string name="billing_remove_logo">Remove logo</string>
-    <string name="billing_free_features">All features are free, with no limits. A one-time purchase removes the trial logo at the bottom left.</string>
+    <string name="billing_free_features">Free to use, with no limits. A one-time purchase removes the logo.</string>
     <string name="billing_owned">Purchased</string>
     <string name="billing_buy">Buy · %1$s</string>
     <string name="billing_restore">Restore purchase</string>
