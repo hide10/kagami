@@ -27,7 +27,7 @@ private const val FADED = 0.4f
 
 internal inline fun DrawScope.grid(block: DrawScope.() -> Unit) = scale(size.minDimension / 24f, Offset.Zero, block)
 
-private fun svgPath(d: String) = PathParser().parsePathString(d).toPath()
+internal fun svgPath(d: String) = PathParser().parsePathString(d).toPath()
 
 // 画面の左に映る目。右の目はこれを x = 12 で左右に返して描く。
 private val EYE = svgPath("M1.4 11.2 C3.3 6 8.9 6 10.6 11.2 C8.9 15.6 3.3 15.6 1.4 11.2 Z")
