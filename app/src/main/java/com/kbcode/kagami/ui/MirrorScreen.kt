@@ -16,8 +16,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,6 +53,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -99,6 +104,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
@@ -614,13 +620,8 @@ private fun PartBar(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) 
             }
             Row(Modifier.fillMaxWidth()) {
                 val cell = Modifier.weight(1f)
-                val whole = state.target == null && state.pendingPart == null
-                GlyphButton(R.string.part_all, cell, selected = whole, onClick = vm::showAll) { partGlyph(null) }
-                for ((part, name) in PARTS) {
-                    GlyphButton(name, cell, selected = state.pendingPart == part, enabled = !state.frozen, onClick = { onPart(part) }) {
-                        partGlyph(part)
-                    }
-                }
+                PartButton(R.string.part_all, null, state.selects(null), enabled = true, vm::showAll, cell)
+                for ((part, name) in PARTS) PartButton(name, part, state.selects(part), enabled = !state.frozen, { onPart(part) }, cell)
             }
         }
     }
@@ -696,9 +697,7 @@ private fun SliderRow(
 @Composable
 private fun GlyphButton(
     @StringRes description: Int,
-    modifier: Modifier = Modifier,
     selected: Boolean = false,
-    enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
     glyph: DrawScope.() -> Unit,
@@ -706,7 +705,7 @@ private fun GlyphButton(
     val haptics = LocalHapticFeedback.current
     val name = stringResource(description)
     Box(
-        modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+        Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
             .background(if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent)
             .semantics {
@@ -714,7 +713,6 @@ private fun GlyphButton(
                 this.selected = selected
             }
             .combinedClickable(
-                enabled = enabled,
                 role = Role.Button,
                 onLongClick = onLongClick?.let { long ->
                     {
@@ -725,5 +723,46 @@ private fun GlyphButton(
                 onClick = onClick,
             ),
         Alignment.Center,
-    ) { Canvas(Modifier.size(28.dp).alpha(if (enabled) 1f else 0.38f), onDraw = glyph) }
+    ) { Canvas(Modifier.size(28.dp), onDraw = glyph) }
+}
+
+/** 選んだ部位のボタンの下地。白く淡く塗って ACCENT の細い縁を付け、黄色で描く寄る所が下地に溶けないようにする。 */
+private val PILL = RoundedCornerShape(50)
+private val PILL_FILL = Color.White.copy(alpha = 0.16f)
+private val PILL_RING = ACCENT.copy(alpha = 0.8f)
+
+/** 選んでいない部位の絵の濃さ。選んだものより控えめに見せる。 */
+private const val CALM = 0.6f
+
+/** 止めているあいだの部位のボタンの濃さ。選んだボタンも下地ごと薄くなるが、どれを選んでいるかは見える。 */
+private const val DISABLED = 0.5f
+
+/**
+ * 部位の帯のボタン。part が null なら全体。選んでいるものは丸い下地に縁を付け、絵を大きくはっきり描き、
+ * ほかは小さく控えめに描く。押せる範囲は升目いっぱいで、波紋は下地の形に収める。
+ */
+@Composable
+private fun PartButton(@StringRes description: Int, part: FacePart?, selected: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    val name = stringResource(description)
+    val t by animateFloatAsState(if (selected) 1f else 0f, label = "part")
+    val press = remember { MutableInteractionSource() }
+    Box(
+        modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .alpha(if (enabled) 1f else DISABLED)
+            .semantics {
+                contentDescription = name
+                this.selected = selected
+            }
+            .clickable(press, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
+        Alignment.Center,
+    ) {
+        Box(
+            Modifier.size(60.dp, 40.dp)
+                .clip(PILL)
+                .background(PILL_FILL.copy(alpha = PILL_FILL.alpha * t))
+                .border(1.dp, PILL_RING.copy(alpha = PILL_RING.alpha * t), PILL)
+                .indication(press, ripple()),
+            Alignment.Center,
+        ) { Canvas(Modifier.size(lerp(26.dp, 32.dp, t)).alpha(CALM + (1f - CALM) * t)) { partGlyph(part) } }
+    }
 }

@@ -149,6 +149,72 @@ class MirrorStateTest {
         assertEquals(dragged, missed.faceFound(f, PHONE).target)
     }
 
+    /** 選んでいるボタン。null は全体で、どれも選んでいなければ空。 */
+    private fun MirrorState.selected() = (listOf(null) + FacePart.entries).filter { selects(it) }
+
+    @Test
+    fun theWholeButtonIsSelectedAtTheStart() {
+        assertEquals(listOf(null), MirrorState().selected())
+    }
+
+    @Test
+    fun aPartIsSelectedOnceItsFaceIsFoundAndNotWhileWaiting() {
+        val pressed = MirrorState().request(FacePart.LEFT_EYE)
+        assertEquals(listOf(null), pressed.selected())
+        assertEquals(listOf(FacePart.LEFT_EYE), pressed.faceFound(f, PHONE).selected())
+    }
+
+    @Test
+    fun aPartWhoseFaceWasNotFoundKeepsTheSelection() {
+        assertEquals(listOf(null), MirrorState().request(FacePart.NOSE).partMissed().selected())
+        val nose = MirrorState().request(FacePart.NOSE).faceFound(f, PHONE)
+        assertEquals(listOf(FacePart.NOSE), nose.request(FacePart.MOUTH).selected())
+        assertEquals(listOf(FacePart.NOSE), nose.request(FacePart.MOUTH).partMissed().selected())
+        assertEquals(listOf(FacePart.MOUTH), nose.request(FacePart.MOUTH).faceFound(f, PHONE).selected())
+    }
+
+    @Test
+    fun movingByHandSelectsNothingUntilTheWholeViewShowsAgain() {
+        val nose = MirrorState().request(FacePart.NOSE).faceFound(f, PHONE)
+        assertEquals(emptyList<FacePart?>(), nose.moveTo(dragged).selected())
+        assertEquals(emptyList<FacePart?>(), nose.moveTo(nose.target!!).selected())
+        assertEquals(listOf(null), nose.moveTo(Crop.full(PHONE)).selected())
+        assertEquals(listOf(null), nose.showAll().selected())
+        assertEquals(listOf(null), MirrorState().moveTo(dragged).showAll().selected())
+    }
+
+    @Test
+    fun theSelectionStaysWhileFrozenAndFollowsTheFingersThere() {
+        val eye = MirrorState().request(FacePart.RIGHT_EYE).faceFound(f, PHONE)
+        val frozen = eye.freeze(frame, PHONE)
+        assertEquals(listOf(FacePart.RIGHT_EYE), frozen.selected())
+        assertEquals(listOf(FacePart.RIGHT_EYE), frozen.unfreeze().selected())
+        assertEquals(emptyList<FacePart?>(), frozen.moveTo(Crop(600f, 1000f, 4f)).selected())
+        assertEquals(listOf(null), frozen.moveTo(frame).selected())
+        assertEquals(listOf(null), frozen.showAll().selected())
+        assertEquals(emptyList<FacePart?>(), frozen.moveTo(frame).unfreeze().selected())
+    }
+
+    @Test
+    fun atMostOneButtonIsEverSelected() {
+        val rnd = Random(5)
+        val steps = listOf<(MirrorState) -> MirrorState>(
+            { it.request(FacePart.entries[rnd.nextInt(FacePart.entries.size)]) },
+            { it.faceFound(f, PHONE) },
+            { it.partMissed() },
+            { it.moveTo(Crop(540f, 960f, 1f + rnd.nextInt(3))) },
+            { it.showAll() },
+            { it.freeze(frame, PHONE) },
+            { it.unfreeze() },
+        )
+        var s = MirrorState()
+        repeat(2000) {
+            s = steps[rnd.nextInt(steps.size)](s)
+            assertTrue("$s", s.selected().size <= 1)
+            assertTrue("$s", s.shownPart == null || s.target != null)
+        }
+    }
+
     @Test
     fun pressingAPanelOpensItAndPressingItAgainClosesIt() {
         val open = MirrorState().toggle(Panel.COLOR)

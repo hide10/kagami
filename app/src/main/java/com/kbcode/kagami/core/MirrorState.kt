@@ -5,6 +5,7 @@ enum class Panel { COLOR, LIGHT }
 /**
  * target は見せたい切り出しで、null は全体。動かすのはボタンと指だけで、顔を追いかけはしない。
  * pendingPart は押された部位ボタンで、顔が見つかったときに一度だけ寄る。
+ * shownPart は最後に寄った部位で、target はその部位の切り出し。指やタップで動かすか全体に戻すと null になる。
  * still は止めた一枚を映しているあいだ、その一枚にカメラが切り出していた範囲(ビュー座標)。止めているあいだはその範囲が全体になる。
  * 部位はカメラの今の顔で決めるので、止めているあいだは寄れない。
  * fullScreen は全面鏡モードで、映像だけを画面いっぱいに映し、2 本指タップのほかの操作は受け付けない。
@@ -12,6 +13,7 @@ enum class Panel { COLOR, LIGHT }
 data class MirrorState(
     val target: Crop? = null,
     val pendingPart: FacePart? = null,
+    val shownPart: FacePart? = null,
     val still: Crop? = null,
     val color: ColorAdjust = ColorAdjust(),
     val light: ScreenLight = ScreenLight(),
@@ -52,10 +54,20 @@ data class MirrorState(
         return copy(light = light.copy(on = on), panel = panel.takeUnless { !on && it == Panel.LIGHT })
     }
 
-    fun showAll() = copy(target = null, pendingPart = null)
+    /**
+     * 部位の帯でボタン part(null は全体)を選んでいるか。部位は最後に寄った部位で、顔を待つあいだも見つからなかったときも前のまま。
+     * 全体は見せられる範囲をまるごと見せているあいだで、指で 1 倍まで引いたときも含む。止めているあいだも選んだままにする。
+     */
+    fun selects(part: FacePart?): Boolean = when {
+        part != null -> part == shownPart
+        shownPart != null -> false
+        else -> target.let { it == null || it.zoom <= (still?.zoom ?: 1f) }
+    }
 
-    /** タップや指で決めた切り出し。押したばかりの部位ボタンは取り消す。 */
-    fun moveTo(crop: Crop) = copy(target = crop, pendingPart = null)
+    fun showAll() = copy(target = null, pendingPart = null, shownPart = null)
+
+    /** タップや指で決めた切り出し。押したばかりの部位ボタンも、寄っていた部位も外す。 */
+    fun moveTo(crop: Crop) = copy(target = crop, pendingPart = null, shownPart = null)
 
     /** 顔が見つかるまで見え方は変えない。続けて押せば最後の部位が残る。止めているあいだは受け付けない。 */
     fun request(part: FacePart) = if (frozen) this else copy(pendingPart = part)
@@ -74,5 +86,5 @@ data class MirrorState(
 
     /** face はビュー座標。待っている部位がなければ何も変えない。 */
     fun faceFound(face: FaceLandmarks, size: Size) =
-        pendingPart?.let { copy(target = CropPlanner.zoomOnPart(it, face, size), pendingPart = null) } ?: this
+        pendingPart?.let { copy(target = CropPlanner.zoomOnPart(it, face, size), pendingPart = null, shownPart = it) } ?: this
 }
