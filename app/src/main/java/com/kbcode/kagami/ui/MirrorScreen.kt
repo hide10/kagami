@@ -234,7 +234,6 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
         }
         fun onGesture(g: Gesture) {
             val s = vm.state.value
-            if (!s.allows(g)) return
             when (g) {
                 is Gesture.Tap -> {
                     // 寄るのと同じ点にピントと露出を合わせる。止めた一枚はカメラの今の映像ではないので合わせない。
@@ -286,6 +285,8 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
             Box(Modifier.fillMaxSize().pointerInput(size) { readTouches(::onGesture) })
         }
         if (state.glowing == LightMode.BAND) LightBand(light, glow)
+        // 全面のあいだはボタンと帯とパネルを隠すだけで、プレビューへの指の操作はふだんと同じ。右端の寄り引きの帯も隠す。
+        // 見えない帯を残すと、その幅ではタップも長押しもピンチもプレビューへ届かなくなるからで、寄り引きはピンチと 2 本指の上下でできる。
         if (!state.fullScreen) Column(Modifier.fillMaxSize()) {
             FunctionRow(state, vm, helping = help, onFreeze = ::toggleFreeze, onHelp = { help = true })
             // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。戻るジェスチャーの幅の上にも重ね、切り欠きだけ避ける。
@@ -299,7 +300,6 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
                     Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(TRACK_WIDTH),
                 )
                 // 試用版の文字は露出の帯のすぐ上の左端に置き、左の戻るジェスチャーの幅だけ内側へ寄せる。押せないので、下のプレビューへの指は遮らない。
-                // 全面のあいだはほかの UI と一緒に隠れる。
                 if (billing.showLogo) {
                     TrialLogo(
                         Modifier.align(Alignment.BottomStart)

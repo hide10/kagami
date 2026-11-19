@@ -8,7 +8,7 @@ enum class Panel { COLOR, LIGHT }
  * shownPart は最後に寄った部位で、target はその部位の切り出し。指やタップで動かすか全体に戻すと null になる。
  * still は止めた一枚を映しているあいだ、その一枚にカメラが切り出していた範囲(ビュー座標)。止めているあいだはその範囲が全体になる。
  * 部位はカメラの今の顔で決めるので、止めているあいだは寄れない。
- * fullScreen は全面鏡モードで、映像だけを画面いっぱいに映し、2 本指タップのほかの操作は受け付けない。
+ * fullScreen は全面鏡モードで、ボタンと帯とパネルを隠して映像を画面いっぱいに映す。指の操作はふだんと同じに使える。
  */
 data class MirrorState(
     val target: Crop? = null,
@@ -24,8 +24,6 @@ data class MirrorState(
 
     /** 入るのも抜けるのも 2 本指タップ。ほかの状態は変えないので、抜ければ元の画面に戻る。 */
     fun toggleFullScreen() = copy(fullScreen = !fullScreen)
-
-    fun allows(g: Gesture) = !fullScreen || g == Gesture.TwoFingerTap
 
     /** 画面を光らせている光らせ方。消えていれば null。全面では縮小でも映像を画面いっぱいに保ち、同じ光の量の縁で光らせる。 */
     val glowing: LightMode?

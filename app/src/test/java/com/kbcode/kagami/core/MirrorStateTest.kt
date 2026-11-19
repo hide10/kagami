@@ -276,6 +276,7 @@ class MirrorStateTest {
             { it.toggleLight() },
             { it.toggle(Panel.LIGHT) },
             { it.toggle(Panel.COLOR) },
+            { it.toggleFullScreen() },
         )
         var s = MirrorState()
         repeat(2000) {
@@ -315,14 +316,33 @@ class MirrorStateTest {
     }
 
     @Test
-    fun inFullScreenOnlyTheTwoFingerTapGetsThrough() {
+    fun theFingersMoveLightAndFreezeInFullScreenWithoutLeavingIt() {
         val full = MirrorState().toggleFullScreen()
-        assertTrue(full.allows(Gesture.TwoFingerTap))
-        assertTrue(MirrorState().allows(Gesture.TwoFingerTap))
-        for (g in listOf(Gesture.Tap(Pt(1f, 2f)), Gesture.LongPress, Gesture.Move(Pt(0f, 0f), Pt(5f, 5f), 1.2f))) {
-            assertFalse("$g", full.allows(g))
-            assertTrue("$g", MirrorState().allows(g))
-        }
+        val moved = full.moveTo(dragged)
+        assertEquals(dragged, moved.target)
+        assertTrue(moved.fullScreen)
+        val lit = moved.toggleLight()
+        assertEquals(LightMode.BAND, lit.glowing)
+        val frozen = lit.freeze(Crop(540f, 960f, 2f), PHONE)
+        assertTrue(frozen.frozen)
+        assertEquals(LightMode.BAND, frozen.glowing)
+        assertTrue(frozen.fullScreen)
+        val back = frozen.unfreeze().toggleLight()
+        assertFalse(back.frozen)
+        assertNull(back.glowing)
+        assertTrue(back.fullScreen)
+    }
+
+    @Test
+    fun turningTheLightOffInFullScreenClosesItsPanelForWhenFullScreenEnds() {
+        val off = MirrorState().toggle(Panel.LIGHT).toggleFullScreen().toggleLight()
+        assertNull(off.glowing)
+        assertNull(off.toggleFullScreen().panel)
+        val on = off.toggleLight()
+        assertEquals(LightMode.BAND, on.glowing)
+        assertNull(on.toggleFullScreen().panel)
+        val color = MirrorState(light = ScreenLight(on = true)).toggle(Panel.COLOR).toggleFullScreen().toggleLight()
+        assertEquals(Panel.COLOR, color.toggleFullScreen().panel)
     }
 
     @Test
