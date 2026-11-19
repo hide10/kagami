@@ -43,7 +43,11 @@ fun CameraPermissionGate(content: @Composable () -> Unit) {
         access = if (it) Access.GRANTED else Access.DENIED
     }
     LaunchedEffect(Unit) { if (access == Access.ASKING) request.launch(Manifest.permission.CAMERA) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { if (granted()) access = Access.GRANTED }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (granted()) access = Access.GRANTED
+        // 設定で権限を取り消されて戻ったときは案内へ戻す。
+        else if (access == Access.GRANTED) access = Access.DENIED
+    }
 
     when (access) {
         Access.GRANTED -> content()
