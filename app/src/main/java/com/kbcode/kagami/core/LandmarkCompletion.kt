@@ -23,6 +23,10 @@ data class RawLandmarks(
  * 顔は正立画像でほぼ縦向きとし、傾きは両目の線と、目から鼻への向きから拾う。矩形が空で何も決められなければ null。
  */
 fun completeLandmarks(raw: RawLandmarks, box: FaceBox): FaceLandmarks? {
+    // 全部取れているときは外接矩形を見ない。
+    if (raw.leftEye != null && raw.rightEye != null && raw.nose != null && raw.mouthLeft != null && raw.mouthRight != null) {
+        return FaceLandmarks(raw.leftEye, raw.rightEye, raw.nose, raw.mouthLeft.midTo(raw.mouthRight))
+    }
     if (box.width <= 0f || box.height <= 0f) return null
     // 顔の中心線の x。鼻、両目の中点、矩形の中心の順に頼る。
     val axisX = raw.nose?.x
@@ -33,6 +37,11 @@ fun completeLandmarks(raw: RawLandmarks, box: FaceBox): FaceLandmarks? {
     var rightEye = raw.rightEye
     if (leftEye == null && rightEye != null) leftEye = Pt(2 * axisX - rightEye.x, rightEye.y)
     if (rightEye == null && leftEye != null) rightEye = Pt(2 * axisX - leftEye.x, leftEye.y)
+    // 片目と鼻の x がほぼ一致すると、折り返した目が同じ点に潰れる。目の間隔が矩形の幅に比べて極端に狭ければ、両目とも矩形から取り直す。
+    if (leftEye != null && rightEye != null && leftEye.distTo(rightEye) < box.width * MIN_EYE_SPAN) {
+        leftEye = null
+        rightEye = null
+    }
     if (leftEye == null || rightEye == null) {
         val half = box.width * EYE_HALF_SPAN
         val y = raw.nose?.let { it.y - NOSE_BELOW_EYES * 2 * half } ?: (box.top + box.height * EYE_LINE)
@@ -66,6 +75,9 @@ fun completeLandmarks(raw: RawLandmarks, box: FaceBox): FaceLandmarks? {
 
 /** 外接矩形の幅に対する、両目の間隔の半分。 */
 private const val EYE_HALF_SPAN = 0.22f
+
+/** 両目の間隔が、外接矩形の幅のこれ未満なら潰れているとみなす。 */
+private const val MIN_EYE_SPAN = 0.15f
 
 /** 外接矩形の上端から目の線までの、高さに対する割合。 */
 private const val EYE_LINE = 0.38f
