@@ -8,17 +8,17 @@ data class Finger(val id: Long, val at: Pt, val pressed: Boolean = true)
 
 /** 指の動きから読み取った操作。 */
 sealed interface Gesture {
-    /** 1 本指を動かさずに、長押しになる前に離した。at は離した位置。ダブルタップの 1 回目もすぐにタップとして届く。 */
+    /** 1 本指を動かさずに、長押しになる前に離した。at は離した位置。続けてタップしても、1 回ずつタップとして届く。 */
     data class Tap(val at: Pt) : Gesture
-
-    /** タップのすぐあとに、近くをもう一度タップした。2 回目はタップとしては届かない。 */
-    data object DoubleTap : Gesture
 
     /** 1 本指を動かさずに押し続けた。離す前に届き、そのあと動かせば Move になる。 */
     data object LongPress : Gesture
 
     /** 2 本指をほぼ同時に置き、ほとんど動かさずにすぐ離した。 */
     data object TwoFingerTap : Gesture
+
+    /** 3 本指をほぼ同時に置き、ほとんど動かさずにすぐ離した。 */
+    data object ThreeFingerTap : Gesture
 
     /** 1 本指のドラッグとピンチ。CropPlanner.transform に渡す値で、centroid は動く前の指の重心、pan はその移動、zoom は指の間隔の比。 */
     data class Move(val centroid: Pt, val pan: Pt, val zoom: Float) : Gesture
@@ -34,14 +34,10 @@ sealed interface Gesture {
 data class TouchRules(
     val slop: Float,
     val longPressMs: Long,
-    /** ダブルタップの 2 回目は、1 回目を離してからこの時間のうちに置く。 */
-    val doubleTapMs: Long,
-    /** ダブルタップの 2 回目は、1 回目を離した位置からこの距離(px)のうちで離す。 */
-    val doubleTapSlop: Float,
-    /** 2 本指タップの 2 本目は、1 本目を置いてからこの時間のうちに置く。 */
-    val twoFingerGapMs: Long = 150,
-    /** 2 本指タップは、1 本目を置いてからこの時間のうちに全部離す。 */
-    val twoFingerTapMs: Long = 400,
+    /** 2 本指・3 本指のタップは、1 本目を置いてからこの時間のうちに残りの指を全部置く。 */
+    val fingersGapMs: Long = 150,
+    /** 2 本指・3 本指のタップは、1 本目を置いてからこの時間のうちに全部離す。 */
+    val fingersTapMs: Long = 400,
 )
 
 /**
@@ -49,7 +45,7 @@ data class TouchRules(
  * 置いた位置から slop を越えて動いたときに一度だけ動き方を決め、指の数が変わっても全部離すまで変えない。
  * 1 本指なら Move。2 本指以上なら、指の間隔の変化が重心の移動より大きければピンチの Move、
  * そうでなければ重心の動きの縦横の大きいほうで、縦は ZoomDrag、横は ExposureDrag。
- * 動かずに離したときは、1 本指ならタップかダブルタップ、2 本指をほぼ同時に置いてすぐ離したなら 2 本指タップ。
+ * 動かずに離したときは、1 本指ならタップ、2 本か 3 本の指をほぼ同時に置いてすぐ離したなら 2 本指タップか 3 本指タップ。
  * 1 本指を動かさずに longPressMs たてば長押し。
  */
 class TouchReader(private val rules: TouchRules) {
@@ -57,7 +53,6 @@ class TouchReader(private val rules: TouchRules) {
     private val start = HashMap<Long, Pt>()
     private val now = HashMap<Long, Pt>()
     private var touch: Touch? = null
-    private var lastTap: LastTap? = null
 
     /** 長押しを待っているあいだ、それが決まる時刻。それまでに指の動きが届かなければ、その時刻に tick を呼ぶ。 */
     val deadline: Long?
@@ -84,8 +79,10 @@ class TouchReader(private val rules: TouchRules) {
             }
         }
         val t = touch ?: if (now.isEmpty()) return due else Touch(timeMs).also { touch = it }
-        t.most = max(t.most, now.size)
-        if (now.size >= 2 && t.second == null) t.second = timeMs
+        if (now.size > t.most) {
+            t.most = now.size
+            t.allDown = timeMs
+        }
         if (now.isEmpty()) {
             touch = null
             return due ?: finish(t, timeMs, fingers.first { !it.pressed }.at)
@@ -136,32 +133,24 @@ class TouchReader(private val rules: TouchRules) {
         return if (c0 == c1 && zoom == 1f) null else Gesture.Move(c0, c1 - c0, zoom)
     }
 
-    private fun finish(t: Touch, timeMs: Long, at: Pt): Gesture? {
-        val previous = lastTap
-        lastTap = null
-        val second = t.second
-        return when {
-            t.kind != null || t.held -> null
-            t.most == 1 && previous != null && t.since - previous.upMs <= rules.doubleTapMs && previous.at.distTo(at) <= rules.doubleTapSlop ->
-                Gesture.DoubleTap
-            t.most == 1 -> Gesture.Tap(at).also { lastTap = LastTap(timeMs, at) }
-            t.most == 2 && second != null && second - t.since <= rules.twoFingerGapMs && timeMs - t.since <= rules.twoFingerTapMs ->
-                Gesture.TwoFingerTap
-            else -> null
-        }
+    private fun finish(t: Touch, timeMs: Long, at: Pt): Gesture? = when {
+        t.kind != null || t.held -> null
+        t.most == 1 -> Gesture.Tap(at)
+        t.allDown - t.since > rules.fingersGapMs || timeMs - t.since > rules.fingersTapMs -> null
+        t.most == 2 -> Gesture.TwoFingerTap
+        t.most == 3 -> Gesture.ThreeFingerTap
+        else -> null
     }
 
     private enum class Kind { MOVE, ZOOM, EXPOSURE }
 
-    private class LastTap(val upMs: Long, val at: Pt)
-
     /**
-     * 1 回の操作。most は同時に置いた指のいちばん多い数、second は 2 本目を置いた時刻、held は長押しを知らせたか、
+     * 1 回の操作。most は同時に置いた指のいちばん多い数、allDown はその数がそろった時刻、held は長押しを知らせたか、
      * kind は決まった動き方、dx は ExposureDrag で届けた横の移動の合計。
      */
     private class Touch(val since: Long) {
         var most = 0
-        var second: Long? = null
+        var allDown = since
         var held = false
         var kind: Kind? = null
         var dx: Float? = null

@@ -240,13 +240,12 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
                     }
                     vm.moveTo(CropPlanner.tap(g.at, crop, size, s.extent(size)))
                 }
-                // 1 回目のタップはもう寄ってピントも合わせたので、2 回目はライトだけを切り替え、もう一度は寄らない。
-                Gesture.DoubleTap -> vm.toggleLight()
                 Gesture.LongPress -> {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     toggleFreeze()
                 }
                 Gesture.TwoFingerTap -> vm.toggleFullScreen()
+                Gesture.ThreeFingerTap -> vm.toggleLight()
                 is Gesture.Move -> {
                     crop = CropPlanner.transform(crop, g.centroid, g.pan, g.zoom, size, s.extent(size))
                     vm.moveTo(crop)
@@ -497,19 +496,9 @@ private fun HideSystemBars() {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hide() }
 }
 
-/** ダブルタップの 2 回目が 1 回目からずれてよい距離。Android の ViewConfiguration の doubleTapSlop と同じ。 */
-private val DOUBLE_TAP_SLOP = 100.dp
-
 /** 届いた指を TouchReader で読み分けて onGesture へ渡す。長押しは次の動きを待たず、決まる時刻に渡す。 */
 private suspend fun PointerInputScope.readTouches(onGesture: (Gesture) -> Unit) {
-    val reader = TouchReader(
-        TouchRules(
-            slop = viewConfiguration.touchSlop,
-            longPressMs = viewConfiguration.longPressTimeoutMillis,
-            doubleTapMs = viewConfiguration.doubleTapTimeoutMillis,
-            doubleTapSlop = DOUBLE_TAP_SLOP.toPx(),
-        ),
-    )
+    val reader = TouchReader(TouchRules(slop = viewConfiguration.touchSlop, longPressMs = viewConfiguration.longPressTimeoutMillis))
     awaitPointerEventScope {
         while (true) {
             val wait = reader.deadline?.minus(SystemClock.uptimeMillis())

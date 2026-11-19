@@ -34,11 +34,11 @@
     <string name="hint_full_screen">Full screen</string>
 
     <string name="gesture_tap">Tap</string>
-    <string name="gesture_double_tap">Double tap</string>
     <string name="gesture_long_press">Long press</string>
     <string name="gesture_pinch">Pinch</string>
     <string name="gesture_two_finger_horizontal">Two-finger drag sideways</string>
     <string name="gesture_two_finger_tap">Two-finger tap</string>
+    <string name="gesture_three_finger_tap">Three-finger tap</string>
 
     <string name="logo_trial_label">Kagami Mirror Trial</string>
     <string name="billing_remove_logo">Remove logo</string>

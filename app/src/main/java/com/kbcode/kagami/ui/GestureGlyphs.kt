@@ -21,11 +21,11 @@ import com.kbcode.kagami.R
 /** 使い方に出す指の操作を、出す順に。label は絵の読み上げに使う操作の名前、hint はそれでできること、loopMs は絵の動きの 1 周の長さ。 */
 enum class GestureIcon(@StringRes val label: Int, @StringRes val hint: Int, val loopMs: Int) {
     TAP(R.string.gesture_tap, R.string.hint_focus, 1600),
-    DOUBLE_TAP(R.string.gesture_double_tap, R.string.hint_light, 1800),
     LONG_PRESS(R.string.gesture_long_press, R.string.hint_pause, 2000),
     PINCH(R.string.gesture_pinch, R.string.hint_zoom, 1800),
     TWO_FINGER_HORIZONTAL(R.string.gesture_two_finger_horizontal, R.string.hint_exposure, 2000),
     TWO_FINGER_TAP(R.string.gesture_two_finger_tap, R.string.hint_full_screen, 1600),
+    THREE_FINGER_TAP(R.string.gesture_three_finger_tap, R.string.hint_light, 1600),
 }
 
 /** 指 1 本。付け根 (x, y) から角度 angle(0 が真上で、正が時計回り)へ、長さ length・太さ width の両端の丸い棒で伸びる。 */
@@ -51,6 +51,13 @@ private val CURLED_TWO = listOf(Digit(6.6f, 3.2f, 3f, 6f), Digit(8.8f, 2.4f, 2.6
 /** 人差し指と中指をそろえて立てた手。tip は 2 本の指先のあいだ。 */
 private val TWO = Hand(listOf(Digit(0f, 10.6f, 3.4f, -4f), Digit(3.6f, 11.4f, 3.4f, 4f)), CURLED_TWO, Offset(1.8f, -9f))
 
+/** 人差し指・中指・薬指を少し開いて立てた手。tip は中指の指先。 */
+private val THREE = Hand(
+    extended = listOf(Digit(-0.2f, 10.4f, 3.4f, -5f), Digit(3f, 11.4f, 3.4f, 0f), Digit(6.2f, 10.6f, 3.2f, 5f)),
+    curled = listOf(Digit(8.8f, 2.4f, 2.6f, 12f)),
+    tip = Offset(3f, -9.4f),
+)
+
 /** 2 本の指を V の字に開いた手。 */
 private val SPREAD = Hand(listOf(Digit(-0.6f, 10.4f, 3.4f, -20f), Digit(3.8f, 11f, 3.4f, 18f)), CURLED_TWO, Offset(1.8f, -9f))
 
@@ -75,12 +82,12 @@ private val NAIL = Color(0xFFC9C5CE)
 
 /**
  * 指の操作 icon の、ループの進み t(0..1、GestureMotion)での絵。gap は絵を置く下地の色で、指のあいだの切れ目に使う。
- * タップの輪は 1 回なら 1 重、ダブルタップなら 2 重。長押しは押している長さを、満ちていく輪で表す。
+ * タップは指の数によらず、触れた指先から輪が 1 つ広がる。長押しは押している長さを、満ちていく輪で表す。
  */
 internal fun DrawScope.gestureGlyph(icon: GestureIcon, gap: Color, t: Float = 0f) = grid {
     val pose = GestureMotion.pose(icon, t)
     when (icon) {
-        GestureIcon.TAP, GestureIcon.DOUBLE_TAP -> {
+        GestureIcon.TAP -> {
             for (r in pose.ripples) ring(TIP, r.radius, r.alpha)
             hand(POINTING, TIP, gap, lift = pose.lift)
         }
@@ -104,6 +111,10 @@ internal fun DrawScope.gestureGlyph(icon: GestureIcon, gap: Color, t: Float = 0f
         GestureIcon.TWO_FINGER_TAP -> {
             for (r in pose.ripples) ring(Offset(12f, 7.2f), r.radius, r.alpha)
             hand(TWO, Offset(12f, 7.6f), gap, scale = 0.9f, lift = pose.lift)
+        }
+        GestureIcon.THREE_FINGER_TAP -> {
+            for (r in pose.ripples) ring(Offset(12f, 7.4f), r.radius, r.alpha)
+            hand(THREE, Offset(12f, 7.6f), gap, scale = 0.86f, lift = pose.lift)
         }
     }
 }

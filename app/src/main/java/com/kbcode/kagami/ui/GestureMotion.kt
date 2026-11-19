@@ -23,7 +23,7 @@ internal data class GesturePose(
 /**
  * 使い方の絵の小さな動き。t はループの進み(0..1)で、1 は 0 に戻る。
  * t = 0 がいちばん分かりやすい形で、動きを止めた端末ではこの形のまま見える。
- * タップは指が 1 回下りて輪が 1 つ広がり、ダブルタップは続けて 2 回下りて輪が 2 つ重なり、長押しは指が沈んだまま輪が満ちる。
+ * タップは指の数によらず指が 1 回下りて輪が 1 つ広がり、長押しは指が沈んだまま輪が満ちる。
  */
 internal object GestureMotion {
     /** 浮いた指の高さ。56dp の絵で 3dp ほど。 */
@@ -43,12 +43,6 @@ internal object GestureMotion {
 
     private val TAP_LIFT = listOf(Key(0f, 0f), Key(0.12f, 0f), Key(0.4f, LIFT), Key(0.78f, LIFT), Key(1f, 0f))
 
-    /** 0.8 と 1(= 0)で 2 回触れ、2 回目のすぐあとが t = 0。 */
-    private val DOUBLE_TAP_LIFT = listOf(
-        Key(0f, 0f), Key(0.06f, 0f), Key(0.24f, LIFT), Key(0.68f, LIFT), Key(0.8f, 0f), Key(0.84f, 0f), Key(0.9f, LIFT * 0.6f), Key(1f, 0f),
-    )
-    private const val DOUBLE_TAP_FIRST = 0.8f
-
     /** 0.62 で触れて 0.7 までに沈み、輪が満ちるまで沈んだまま。満ちたら指を上げて輪を消す。 */
     private val LONG_PRESS_LIFT = listOf(
         Key(0f, -SINK), Key(0.3f, -SINK), Key(0.42f, LIFT), Key(0.55f, LIFT), Key(0.62f, 0f), Key(0.7f, -SINK), Key(1f, -SINK),
@@ -66,10 +60,6 @@ internal object GestureMotion {
         val at = t.mod(1f)
         return when (icon) {
             GestureIcon.TAP -> GesturePose(lift = TAP_LIFT.at(at), ripples = listOf(ripple(at, 3.6f)))
-            GestureIcon.DOUBLE_TAP -> GesturePose(
-                lift = DOUBLE_TAP_LIFT.at(at),
-                ripples = listOf(ripple(at - DOUBLE_TAP_FIRST, 3.4f), ripple(at, 3.4f)),
-            )
             GestureIcon.LONG_PRESS -> GesturePose(
                 lift = LONG_PRESS_LIFT.at(at),
                 fill = if (at in EMPTY_FROM..FILL_FROM) 0f else ((at - FILL_FROM).mod(1f) / FILL_LENGTH).coerceAtMost(1f),
@@ -78,6 +68,7 @@ internal object GestureMotion {
             GestureIcon.PINCH -> GesturePose(spread = PINCH_SPREAD.at(at))
             GestureIcon.TWO_FINGER_HORIZONTAL -> GesturePose(slide = SLIDE * sin(2 * PI * at).toFloat())
             GestureIcon.TWO_FINGER_TAP -> GesturePose(lift = TAP_LIFT.at(at), ripples = listOf(ripple(at, 4.8f)))
+            GestureIcon.THREE_FINGER_TAP -> GesturePose(lift = TAP_LIFT.at(at), ripples = listOf(ripple(at, 5.2f)))
         }
     }
 

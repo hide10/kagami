@@ -21,11 +21,6 @@ class GestureMotionTest {
         assertEquals(0f, tap.lift, 0f)
         assertEquals(1, tap.ripples.count { it.alpha > 0.5f })
 
-        val double = pose(GestureIcon.DOUBLE_TAP, 0f)
-        assertEquals(0f, double.lift, 0f)
-        assertEquals(2, double.ripples.count { it.alpha > 0.5f })
-        assertTrue(double.ripples.maxOf { it.radius } > double.ripples.minOf { it.radius } + 2f)
-
         val long = pose(GestureIcon.LONG_PRESS, 0f)
         assertTrue(long.lift < 0f)
         assertTrue(long.fill in 0.6f..0.9f)
@@ -33,7 +28,11 @@ class GestureMotionTest {
 
         assertEquals(1f, pose(GestureIcon.PINCH, 0f).spread, 0f)
         assertEquals(0f, pose(GestureIcon.TWO_FINGER_HORIZONTAL, 0f).slide, 0f)
-        assertEquals(0f, pose(GestureIcon.TWO_FINGER_TAP, 0f).lift, 0f)
+        for (icon in listOf(GestureIcon.TWO_FINGER_TAP, GestureIcon.THREE_FINGER_TAP)) {
+            val p = pose(icon, 0f)
+            assertEquals("$icon", 0f, p.lift, 0f)
+            assertEquals("$icon", 1, p.ripples.count { it.alpha > 0.5f })
+        }
     }
 
     @Test
@@ -50,11 +49,10 @@ class GestureMotionTest {
     }
 
     @Test
-    fun aTapTouchesOnceADoubleTapTwiceAndEveryRippleStartsUnderTheFinger() {
-        val counts = mapOf(GestureIcon.TAP to 1, GestureIcon.DOUBLE_TAP to 2, GestureIcon.TWO_FINGER_TAP to 1)
-        for ((icon, count) in counts) {
+    fun everyTapTouchesOnceAndItsRippleStartsUnderTheFinger() {
+        for (icon in listOf(GestureIcon.TAP, GestureIcon.TWO_FINGER_TAP, GestureIcon.THREE_FINGER_TAP)) {
             val births = births(icon)
-            assertEquals("$icon", count, births.size)
+            assertEquals("$icon", 1, births.size)
             for (t in births) assertEquals("$icon $t", 0f, pose(icon, t).lift, 0.01f)
         }
     }

@@ -5,14 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-private val RULES = TouchRules(
-    slop = 20f,
-    longPressMs = 500,
-    doubleTapMs = 300,
-    doubleTapSlop = 150f,
-    twoFingerGapMs = 150,
-    twoFingerTapMs = 400,
-)
+private val RULES = TouchRules(slop = 20f, longPressMs = 500, fingersGapMs = 150, fingersTapMs = 400)
 
 /** 画面と同じく、毎回いま置いている指と、離したばかりの指を届ける。届いた操作を seen にためる。 */
 private class Hand(rules: TouchRules = RULES) {
@@ -159,10 +152,66 @@ class TouchReaderTest {
     }
 
     @Test
-    fun aThirdFingerIsNoTwoFingerTap() {
+    fun threeFingersPutDownTogetherAndLiftedQuicklyAreAThreeFingerTapAndNothingElse() {
+        val h = Hand()
+        h.down(0, 1L to Pt(300f, 900f))
+        h.down(70, 2L to Pt(500f, 880f))
+        h.down(140, 3L to Pt(700f, 900f))
+        assertNull("no long press while three fingers are down", h.reader.deadline)
+        h.move(200, 1L to Pt(306f, 903f), 2L to Pt(497f, 884f), 3L to Pt(695f, 898f))
+        h.up(260, 2)
+        h.up(300, 1)
+        h.up(340, 3)
+        assertEquals(listOf(Gesture.ThreeFingerTap), h.seen)
+    }
+
+    @Test
+    fun threeFingersAtOnceInOneEventAreAThreeFingerTap() {
         val h = Hand()
         h.down(0, 1L to Pt(300f, 900f), 2L to Pt(500f, 900f), 3L to Pt(700f, 900f))
         h.up(100, 1, 2, 3)
+        assertEquals(listOf(Gesture.ThreeFingerTap), h.seen)
+    }
+
+    @Test
+    fun aThirdFingerThatComesLateIsNoThreeFingerTapAndNoTwoFingerTap() {
+        val h = Hand()
+        h.down(0, 1L to Pt(400f, 900f), 2L to Pt(600f, 900f))
+        h.down(151, 3L to Pt(800f, 900f))
+        h.up(250, 1, 2, 3)
+        assertTrue(h.seen.isEmpty())
+    }
+
+    @Test
+    fun threeFingersHeldTooLongAreNoThreeFingerTapAndNoLongPress() {
+        val h = Hand()
+        h.down(0, 1L to Pt(300f, 900f), 2L to Pt(500f, 900f), 3L to Pt(700f, 900f))
+        h.clock(1000)
+        h.up(401, 1, 2, 3)
+        assertTrue(h.seen.isEmpty())
+    }
+
+    @Test
+    fun threeFingersThatMoveAreAPinchOrADragAndNoThreeFingerTap() {
+        val pinch = Hand()
+        pinch.down(0, 1L to Pt(300f, 900f), 2L to Pt(500f, 900f), 3L to Pt(700f, 900f))
+        pinch.move(50, 1L to Pt(250f, 900f), 2L to Pt(500f, 900f), 3L to Pt(750f, 900f))
+        pinch.up(100, 1, 2, 3)
+        assertEquals(1, pinch.moves.size)
+        assertTrue(Gesture.ThreeFingerTap !in pinch.seen)
+
+        val drag = Hand()
+        drag.down(0, 1L to Pt(300f, 900f), 2L to Pt(500f, 900f), 3L to Pt(700f, 900f))
+        drag.move(50, 1L to Pt(300f, 860f), 2L to Pt(500f, 860f), 3L to Pt(700f, 860f))
+        drag.up(100, 1, 2, 3)
+        assertEquals(listOf(Gesture.ZoomDrag(-40f)), drag.seen)
+    }
+
+    @Test
+    fun fourFingersAreNoTap() {
+        val h = Hand()
+        h.down(0, 1L to Pt(200f, 900f), 2L to Pt(400f, 900f), 3L to Pt(600f, 900f), 4L to Pt(800f, 900f))
+        h.up(100, 1, 2, 3, 4)
         assertTrue(h.seen.isEmpty())
     }
 
@@ -214,52 +263,16 @@ class TouchReaderTest {
     }
 
     @Test
-    fun aQuickSecondTapNearbyIsADoubleTapInsteadOfASecondTap() {
+    fun quickTapsInTheSameSpotAreEachATap() {
         val h = Hand()
         h.tap(0, Pt(500f, 900f))
-        h.tap(300, Pt(560f, 860f))
-        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.DoubleTap), h.seen)
+        h.tap(150, Pt(510f, 890f))
+        h.tap(300, Pt(500f, 900f))
+        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.Tap(Pt(510f, 890f)), Gesture.Tap(Pt(500f, 900f))), h.seen)
     }
 
     @Test
-    fun aThirdQuickTapStartsOverAsATap() {
-        val h = Hand()
-        h.tap(0, Pt(500f, 900f))
-        h.tap(200, Pt(500f, 900f))
-        h.tap(400, Pt(500f, 900f))
-        h.tap(600, Pt(500f, 900f))
-        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.DoubleTap, Gesture.Tap(Pt(500f, 900f)), Gesture.DoubleTap), h.seen)
-    }
-
-    @Test
-    fun aSecondTapThatComesLateOrFarAwayIsJustATap() {
-        val late = Hand()
-        late.tap(0, Pt(500f, 900f))
-        late.tap(361, Pt(500f, 900f))
-        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.Tap(Pt(500f, 900f))), late.seen)
-        val far = Hand()
-        far.tap(0, Pt(500f, 900f))
-        far.tap(200, Pt(500f, 1100f))
-        assertEquals(listOf(Gesture.Tap(Pt(500f, 900f)), Gesture.Tap(Pt(500f, 1100f))), far.seen)
-    }
-
-    @Test
-    fun aDragOrATwoFingerTapBetweenTapsBreaksTheDoubleTap() {
-        val h = Hand()
-        h.tap(0, Pt(500f, 900f))
-        h.down(100, 1L to Pt(500f, 900f))
-        h.move(130, 1L to Pt(500f, 950f))
-        h.up(160, 1)
-        h.tap(200, Pt(500f, 900f))
-        h.down(300, 1L to Pt(400f, 900f), 2L to Pt(600f, 900f))
-        h.up(350, 1, 2)
-        h.tap(400, Pt(500f, 900f))
-        assertTrue(Gesture.DoubleTap !in h.seen)
-        assertEquals(3, h.seen.count { it is Gesture.Tap })
-    }
-
-    @Test
-    fun holdingTheSecondTapIsALongPressNotADoubleTap() {
+    fun holdingRightAfterATapIsALongPress() {
         val h = Hand()
         h.tap(0, Pt(500f, 900f))
         h.down(200, 1L to Pt(500f, 900f))

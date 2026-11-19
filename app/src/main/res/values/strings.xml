@@ -38,11 +38,11 @@
     <string name="hint_full_screen">全面モード</string>
 
     <string name="gesture_tap">タップ</string>
-    <string name="gesture_double_tap">ダブルタップ</string>
     <string name="gesture_long_press">長押し</string>
     <string name="gesture_pinch">ピンチ</string>
     <string name="gesture_two_finger_horizontal">2本指の水平ドラッグ</string>
     <string name="gesture_two_finger_tap">2本指タップ</string>
+    <string name="gesture_three_finger_tap">3本指タップ</string>
 
     <string name="logo_trial_label">鏡ミラー 試用版</string>
     <string name="billing_remove_logo">ロゴを消す</string>
