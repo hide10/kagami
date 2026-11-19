@@ -141,22 +141,20 @@ suspend fun runFrontCamera(
         // 切り出せるときだけ、base に対する比を Preview と同じ比の点にする factory を作る。Preview はつないだあとなので比が決まっている。
         focus.attach(camera, view, spec?.let { SurfaceOrientedMeteringPointFactory(1f, 1f, preview) })
         val control = Camera2CameraControl.from(camera.cameraControl)
-        try {
-            // StateFlow は同じ値を流さず、待っているあいだに来た値は最後の一つだけ残る。動いている最中は 1 フレームに 1 度、止まれば最後の範囲が必ず届く。
-            crop.requested.filterNotNull().collect { rect ->
-                control.setCaptureRequestOptions(
-                    CaptureRequestOptions.Builder()
-                        .setCaptureRequestOption(CaptureRequest.SCALER_CROP_REGION, Rect(rect.left, rect.top, rect.right, rect.bottom))
-                        .build(),
-                )
-                delay(REQUEST_INTERVAL_MS)
-            }
-        } finally {
-            focus.detach()
-            crop.spec = null
-            provider.unbind(preview, analysis)
+        // StateFlow は同じ値を流さず、待っているあいだに来た値は最後の一つだけ残る。動いている最中は 1 フレームに 1 度、止まれば最後の範囲が必ず届く。
+        crop.requested.filterNotNull().collect { rect ->
+            control.setCaptureRequestOptions(
+                CaptureRequestOptions.Builder()
+                    .setCaptureRequestOption(CaptureRequest.SCALER_CROP_REGION, Rect(rect.left, rect.top, rect.right, rect.bottom))
+                    .build(),
+            )
+            delay(REQUEST_INTERVAL_MS)
         }
     } finally {
+        // bind 済みのまま途中で例外が出ても残さない。bind していないユースケースへの unbind は何も起きない。
+        focus.detach()
+        crop.spec = null
+        provider.unbind(preview, analysis)
         analysisThread.shutdown()
     }
 }
