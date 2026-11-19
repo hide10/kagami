@@ -4,7 +4,7 @@ import kotlin.math.exp
 import kotlin.math.ln
 
 /**
- * ボタンやタップで決めた切り出しへ、見えている切り出しを寄せる時間ベースの指数平滑。zoom は log 空間、中心は線形で寄せる。
+ * 部位ボタンなどで決めた切り出しへ、見えている切り出しを寄せる時間ベースの指数平滑。zoom は log 空間、中心は線形で寄せる。
  * 両端が clamp 済みなら途中も表示領域が画面内に収まる(1/zoom の幾何補間は線形補間以下なので)。
  */
 object CropSmoother {
