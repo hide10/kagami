@@ -35,7 +35,7 @@
     <string name="hint_pause">一時停止</string>
     <string name="hint_zoom">ズーム</string>
     <string name="hint_exposure">露出</string>
-    <string name="hint_full_screen">UIオフ</string>
+    <string name="hint_full_screen">スッキリ</string>
 
     <string name="gesture_tap">タップ</string>
     <string name="gesture_long_press">長押し</string>

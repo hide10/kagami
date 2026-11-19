@@ -31,7 +31,7 @@
     <string name="hint_pause">Pause</string>
     <string name="hint_zoom">Zoom</string>
     <string name="hint_exposure">Exposure</string>
-    <string name="hint_full_screen">UI off</string>
+    <string name="hint_full_screen">Clean</string>
 
     <string name="gesture_tap">Tap</string>
     <string name="gesture_long_press">Press and hold</string>
