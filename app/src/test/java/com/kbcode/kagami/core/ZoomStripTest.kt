@@ -10,6 +10,14 @@ class ZoomStripTest {
     private val length = 1200f
 
     @Test
+    fun aZeroLengthStripLeavesTheCropAsItIs() {
+        val crop = Crop(300f, 700f, 2f)
+        for (length in listOf(0f, -5f)) {
+            for (dy in listOf(-40f, 0f)) assertEquals(crop, ZoomStrip.drag(crop, dy, length, PHONE))
+        }
+    }
+
+    @Test
     fun theWholeStripUpGoesFromTheWholeViewToTenTimesAndBack() {
         val up = ZoomStrip.drag(Crop.full(PHONE), -length, length, PHONE)
         assertEquals(10f, up.zoom, 1e-3f)

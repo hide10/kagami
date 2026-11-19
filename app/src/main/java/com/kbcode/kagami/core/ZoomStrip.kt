@@ -13,7 +13,8 @@ import kotlin.math.roundToInt
 object ZoomStrip {
     /** 長さ length の帯の上を dy(下向きが正)なぞったあとの切り出し。見えている真ん中を保ち、bounds(既定は画像全体)の外は見せない。 */
     fun drag(crop: Crop, dy: Float, length: Float, size: Size, bounds: Crop = Crop.full(size)): Crop =
-        CropPlanner.transform(crop, size.center, Pt(0f, 0f), MAX_ZOOM.pow(-dy / length), size, bounds)
+        // 帯の長さが 0 以下だと dy / length が NaN や無限大になり、coerceIn をすり抜けて切り出しが壊れる。動かさない。
+        if (length <= 0f) crop else CropPlanner.transform(crop, size.center, Pt(0f, 0f), MAX_ZOOM.pow(-dy / length), size, bounds)
 
     /** zoom 倍を示すつまみの位置。0 が下端(1 倍)、1 が上端(MAX_ZOOM 倍)で、なぞった指と同じだけ動く。 */
     fun thumb(zoom: Float): Float = (ln(zoom) / ln(MAX_ZOOM)).coerceIn(0f, 1f)
