@@ -545,7 +545,7 @@ private fun LightBand(light: ScreenLight, glow: Color) {
 /** ピントを合わせた点(画像全体を倍率 1 で見たビュー座標)。タップのたびに作り直すので、同じ点をもう一度タップしても印が出直す。 */
 private class FocusMark(val at: Pt)
 
-/** 合わせた点に二重の輪を出し、FOCUS_FADE_MS で消す。輪は映像と一緒に動くので、その点へ寄っていくあいだも合わせた所に重なる。 */
+/** 合わせた点に二重の輪を出し、FOCUS_FADE_MS で消す。輪は映像と一緒に動くので、そのあと寄り引きしても合わせた所に重なる。 */
 @Composable
 private fun FocusRing(mark: FocusMark?, crop: () -> Crop, view: Size) {
     val fade = remember { Animatable(0f) }
