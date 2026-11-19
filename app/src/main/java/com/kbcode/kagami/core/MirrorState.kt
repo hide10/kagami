@@ -1,7 +1,5 @@
 package com.kbcode.kagami.core
 
-enum class Panel { COLOR, LIGHT }
-
 /**
  * target は見せたい切り出しで、null は全体。動かすのはボタンと指だけで、顔を追いかけはしない。
  * pendingPart は押された部位ボタンで、顔が見つかったときに一度だけ寄る。
@@ -17,7 +15,7 @@ data class MirrorState(
     val still: Crop? = null,
     val color: ColorAdjust = ColorAdjust(),
     val light: ScreenLight = ScreenLight(),
-    val panel: Panel? = null,
+    val lightPanel: Boolean = false,
     val fullScreen: Boolean = false,
 ) {
     val frozen get() = still != null
@@ -40,16 +38,12 @@ data class MirrorState(
     fun extent(size: Size) = still ?: Crop.full(size)
 
     /** ライトのパネルは点いているあいだだけ開くので、消えているときに開けばライトも点ける。 */
-    fun toggle(p: Panel) = when {
-        p == panel -> copy(panel = null)
-        p == Panel.LIGHT -> copy(panel = p, light = light.copy(on = true))
-        else -> copy(panel = p)
-    }
+    fun toggleLightPanel() = if (lightPanel) copy(lightPanel = false) else copy(lightPanel = true, light = light.copy(on = true))
 
     /** ライトの点灯と消灯を切り替える。光の量と色温度はそのまま。消したらライトのパネルも閉じ、点け直しても開かない。 */
     fun toggleLight(): MirrorState {
         val on = !light.on
-        return copy(light = light.copy(on = on), panel = panel.takeUnless { !on && it == Panel.LIGHT })
+        return copy(light = light.copy(on = on), lightPanel = lightPanel && on)
     }
 
     /**

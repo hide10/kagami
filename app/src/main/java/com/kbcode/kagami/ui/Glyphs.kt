@@ -117,15 +117,6 @@ internal fun DrawScope.infoGlyph(active: Boolean) = grid {
     drawLine(c, Offset(12f, 11f), Offset(12f, 16.8f), 2f, StrokeCap.Round)
 }
 
-/** つまみの付いた 3 本のスライダー。 */
-internal fun DrawScope.slidersGlyph(active: Boolean) = grid {
-    val c = if (active) ACCENT else INK
-    for ((y, knob) in listOf(6f to 15f, 12f to 8f, 18f to 13f)) {
-        drawLine(c, Offset(3.5f, y), Offset(20.5f, y), 1.6f, StrokeCap.Round)
-        drawCircle(c, 2.4f, Offset(knob, y))
-    }
-}
-
 /** 丸と 8 本の光の太陽。露出の帯の端に添える。 */
 internal fun DrawScope.sunGlyph() = grid {
     val c = Offset(12f, 12f)

@@ -46,7 +46,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -54,7 +53,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -133,7 +131,6 @@ import com.kbcode.kagami.core.Gesture
 import com.kbcode.kagami.core.ImageMapping
 import com.kbcode.kagami.core.LightMode
 import com.kbcode.kagami.core.MirrorState
-import com.kbcode.kagami.core.Panel
 import com.kbcode.kagami.core.Pt
 import com.kbcode.kagami.core.ScreenLight
 import com.kbcode.kagami.core.SensorMapping
@@ -279,7 +276,7 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
         ) {
             CameraPreview(preview, state.color, faces, camera, focus, zoomed)
             // getBitmap() はミラーと切り抜きを済ませた、プレビューと同じ大きさの一枚で、カメラが切り出した範囲だけが写っている。
-            // その範囲を still として覚え、残りの拡大と色をかければ止めた瞬間と同じに見える。
+            // その範囲を still として覚え、残りの拡大と露出をかければ止めた瞬間と同じに見える。
             still?.let { Image(it, null, zoomed, contentScale = ContentScale.FillBounds, colorFilter = state.color.filter()) }
             FocusRing(focused, { crop }, size)
             Box(Modifier.fillMaxSize().pointerInput(size) { readTouches(::onGesture) })
@@ -418,8 +415,8 @@ private val ZOOM_LABEL = TextStyle(
 )
 
 /**
- * 部位の帯のすぐ上に置く露出のスライダー。2 本指の横なぞりと色・明るさのパネルと同じ露出を動かすので、どれで変えても揃って動く。
- * 止めた一枚にも色はかかるので、止めているあいだも動かせる。指 1 本ぶんの高さを掴めて、左右の端は戻るジェスチャーの幅だけ内側へ寄せる。
+ * 部位の帯のすぐ上に置く露出のスライダー。2 本指の横なぞりと同じ露出を動かすので、どちらで変えても揃って動く。
+ * 止めた一枚にも露出はかかるので、止めているあいだも動かせる。指 1 本ぶんの高さを掴めて、左右の端は戻るジェスチャーの幅だけ内側へ寄せる。
  * 端に太陽の印を添え、無加工でないあいだだけ反対の端に段数を出す。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -619,7 +616,7 @@ private class CameraFrame(private val size: Size) {
     }
 }
 
-/** graphicsLayer には色フィルタがなく、RenderEffect の色フィルタは API 31 からなので、View のレイヤーで色をかける。 */
+/** graphicsLayer には色フィルタがなく、RenderEffect の色フィルタは API 31 からなので、View のレイヤーで露出をかける。 */
 private fun PreviewView.tint(color: ColorAdjust) {
     val filter = color.filter()
     if (filter == null) {
@@ -654,49 +651,26 @@ private fun FunctionRow(state: MirrorState, vm: MirrorViewModel, helping: Boolea
         // Surface は自分の上のタップを下のプレビューへ通さない。外側のタップはそのまま通る。
         Surface(shape = CircleShape, color = SCRIM, contentColor = Color.White) {
             Row {
-                GlyphButton(R.string.button_light, selected = state.light.on, onLongClick = { vm.toggle(Panel.LIGHT) }, onClick = vm::toggleLight) {
+                GlyphButton(R.string.button_light, selected = state.light.on, onLongClick = vm::toggleLightPanel, onClick = vm::toggleLight) {
                     bulbGlyph(state.light.on)
                 }
                 GlyphButton(R.string.button_pause, selected = state.frozen, onClick = onFreeze) { pauseGlyph(state.frozen) }
-                val coloring = state.panel == Panel.COLOR
-                GlyphButton(R.string.button_color, selected = coloring, onClick = { vm.toggle(Panel.COLOR) }) { slidersGlyph(coloring) }
                 GlyphButton(R.string.button_info, selected = helping, onClick = onHelp) { infoGlyph(helping) }
             }
         }
     }
 }
 
-/** 部位のアイコンと、その上に開くパネル。 */
+/** 部位のアイコンと、その上に開くライトのパネル。 */
 @Composable
 private fun PartBar(state: MirrorState, vm: MirrorViewModel, onPart: (FacePart) -> Unit) {
     Surface(Modifier.fillMaxWidth(), color = SCRIM, contentColor = Color.White) {
         Column(Modifier.navigationBarsPadding().padding(vertical = 4.dp)) {
-            when (state.panel) {
-                Panel.COLOR -> ColorPanel(state.color, vm)
-                Panel.LIGHT -> LightPanel(state.light, vm)
-                null -> Unit
-            }
+            if (state.lightPanel) LightPanel(state.light, vm)
             Row(Modifier.fillMaxWidth()) {
                 val cell = Modifier.weight(1f)
                 PartButton(R.string.part_all, null, state.selects(null), enabled = true, vm::showAll, cell)
                 for ((part, name) in PARTS) PartButton(name, part, state.selects(part), enabled = !state.frozen, { onPart(part) }, cell)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ColorPanel(color: ColorAdjust, vm: MirrorViewModel) {
-    Column(Modifier.padding(horizontal = 16.dp)) {
-        SliderRow(R.string.exposure, stringResource(R.string.exposure_value, color.exposureEv), color.exposureEv, ColorAdjust.EV) { v ->
-            vm.adjustColor { it.withExposure(v) }
-        }
-        SliderRow(R.string.color_temperature, kelvinLabel(color.kelvin), color.kelvin, ColorAdjust.KELVIN) { v ->
-            vm.adjustColor { it.withKelvin(v) }
-        }
-        Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
-            TextButton({ vm.adjustColor { ColorAdjust() } }, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
-                Text(stringResource(R.string.reset), fontSize = 14.sp)
             }
         }
     }
@@ -732,7 +706,7 @@ private val LIGHT_MODES = listOf(LightMode.BAND to R.string.light_mode_band, Lig
 @Composable
 private fun kelvinLabel(kelvin: Float) = stringResource(R.string.kelvin_value, (kelvin / 100f).roundToInt() * 100)
 
-/** パネルの項目名の幅。英語のいちばん長い「Exposure」が 1 行に収まる。 */
+/** パネルの項目名の幅。英語の「Amount」「Warmth」が 1 行に収まる。 */
 private val LABEL_WIDTH = 72.dp
 
 @Composable

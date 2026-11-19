@@ -6,7 +6,6 @@ import com.kbcode.kagami.core.Crop
 import com.kbcode.kagami.core.FaceLandmarks
 import com.kbcode.kagami.core.FacePart
 import com.kbcode.kagami.core.MirrorState
-import com.kbcode.kagami.core.Panel
 import com.kbcode.kagami.core.ScreenLight
 import com.kbcode.kagami.core.Size
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +33,7 @@ class MirrorViewModel : ViewModel() {
 
     fun partMissed() = _state.update { it.partMissed() }
 
-    fun toggle(panel: Panel) = _state.update { it.toggle(panel) }
+    fun toggleLightPanel() = _state.update { it.toggleLightPanel() }
 
     fun toggleLight() = _state.update { it.toggleLight() }
 

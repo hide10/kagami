@@ -23,25 +23,16 @@ class ColorAdjustTest {
     }
 
     @Test
-    fun warmTintsRedAndCoolTintsBlue() {
-        val warm = gains(ColorAdjust(kelvin = 3000f).matrix())
-        val cool = gains(ColorAdjust(kelvin = 9000f).matrix())
-        assertTrue("$warm", warm.r > warm.g && warm.g > warm.b)
-        assertTrue("$cool", cool.b > cool.r)
-        assertTrue(!ColorAdjust(kelvin = 3000f).isNeutral)
-    }
-
-    @Test
-    fun exposureDoublesPerStop() {
-        assertEquals(2f, gains(ColorAdjust(exposureEv = 1f).matrix()).g, 1e-5f)
-        assertEquals(0.5f, gains(ColorAdjust(exposureEv = -1f).matrix()).b, 1e-5f)
+    fun exposureDoublesPerStopAndLeavesTheColorAlone() {
+        assertEquals(Rgb(2f, 2f, 2f), gains(ColorAdjust(exposureEv = 1f).matrix()))
+        assertEquals(Rgb(0.5f, 0.5f, 0.5f), gains(ColorAdjust(exposureEv = -1f).matrix()))
     }
 
     @Test
     fun slidingBackNearTheMiddleLeavesThePreviewUntouched() {
-        val adjusted = ColorAdjust().withExposure(1.2f).withKelvin(4100f)
+        val adjusted = ColorAdjust().withExposure(1.2f)
         assertTrue(!adjusted.isNeutral)
-        val back = adjusted.withExposure(-0.1f).withKelvin(6510f)
+        val back = adjusted.withExposure(-0.1f)
         assertTrue("$back", back.isNeutral)
         assertArrayEquals(identity, back.matrix(), 0f)
     }
@@ -77,26 +68,21 @@ class ColorAdjustTest {
     fun aDragMovesTheExposureInThirdsCountedFromWhereItStarted() {
         val width = 1080f
         val third = width / 12
-        val kelvin = ColorAdjust(kelvin = 4000f)
-        assertEquals(1f / 3, kelvin.withExposureDragged(0f, third, width).exposureEv, 1e-6f)
-        assertEquals(4000f, kelvin.withExposureDragged(0f, third, width).kelvin, 0f)
-        assertEquals(0f, kelvin.withExposureDragged(0f, third * 0.4f, width).exposureEv, 0f)
-        assertEquals(-1f / 3, kelvin.withExposureDragged(1f / 3, -third * 1.6f, width).exposureEv, 1e-6f)
+        val c = ColorAdjust()
+        assertEquals(1f / 3, c.withExposureDragged(0f, third, width).exposureEv, 1e-6f)
+        assertEquals(0f, c.withExposureDragged(0f, third * 0.4f, width).exposureEv, 0f)
+        assertEquals(-1f / 3, c.withExposureDragged(1f / 3, -third * 1.6f, width).exposureEv, 1e-6f)
     }
 
     @Test
-    fun slidersStopAtTheEndsOfTheirRange() {
-        val high = ColorAdjust().withExposure(5f).withKelvin(20000f)
-        assertEquals(2f, high.exposureEv, 0f)
-        assertEquals(10000f, high.kelvin, 0f)
-        val low = ColorAdjust().withExposure(-5f).withKelvin(0f)
-        assertEquals(-2f, low.exposureEv, 0f)
-        assertEquals(3000f, low.kelvin, 0f)
+    fun exposureStopsAtTheEndsOfItsRange() {
+        assertEquals(2f, ColorAdjust().withExposure(5f).exposureEv, 0f)
+        assertEquals(-2f, ColorAdjust().withExposure(-5f).exposureEv, 0f)
     }
 
     @Test
     fun matrixNeverTouchesAlphaOrAddsOffsets() {
-        val m = ColorAdjust(exposureEv = 1.3f, kelvin = 4000f).matrix()
+        val m = ColorAdjust(exposureEv = 1.3f).matrix()
         assertEquals(20, m.size)
         assertEquals(1f, m[18])
         for (i in listOf(4, 9, 14, 19)) assertEquals(0f, m[i])

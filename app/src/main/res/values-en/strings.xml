@@ -8,7 +8,6 @@
 
     <string name="button_light">Light</string>
     <string name="button_pause">Pause</string>
-    <string name="button_color">Color and brightness</string>
     <string name="button_info">Info</string>
     <string name="zoom_track">Drag up or down to zoom</string>
 
@@ -20,7 +19,6 @@
 
     <string name="exposure">Exposure</string>
     <string name="color_temperature">Warmth</string>
-    <string name="reset">Reset</string>
     <string name="light_mode">Style</string>
     <string name="light_mode_band">Edge</string>
     <string name="light_mode_shrink">Shrink</string>

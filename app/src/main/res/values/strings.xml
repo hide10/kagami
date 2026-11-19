@@ -9,7 +9,6 @@
 
     <string name="button_light">ライト</string>
     <string name="button_pause">静止</string>
-    <string name="button_color">色・明るさ</string>
     <string name="button_info">情報</string>
     <string name="zoom_track">上下になぞって拡大・縮小</string>
 
@@ -21,7 +20,6 @@
 
     <string name="exposure">明るさ</string>
     <string name="color_temperature">色温度</string>
-    <string name="reset">元に戻す</string>
     <string name="light_mode">光り方</string>
     <string name="light_mode_band">縁</string>
     <string name="light_mode_shrink">縮小</string>
