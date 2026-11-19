@@ -11,22 +11,21 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.util.lerp
 import com.kbcode.kagami.R
 
 // 指の操作の絵。手の甲から見た白い手で、伸ばした指の数と向きがそのまま操作の指になる。触れた輪と動きの矢印は ACCENT で描く。
 // 手の部品は、下地の色 gap の縁取りを敷いてから白く塗る。後から描いた指が前に重なり、そのあいだに切れ目が見える。
 // 格子は Glyphs.kt と同じ 24×24。
 
-/** 使い方に出す指の操作。label は絵の読み上げに使う操作の名前。 */
-enum class GestureIcon(@StringRes val label: Int) {
-    TAP(R.string.gesture_tap),
-    DOUBLE_TAP(R.string.gesture_double_tap),
-    LONG_PRESS(R.string.gesture_long_press),
-    EDGE_DRAG(R.string.gesture_edge_drag),
-    PINCH(R.string.gesture_pinch),
-    TWO_FINGER_VERTICAL(R.string.gesture_two_finger_vertical),
-    TWO_FINGER_HORIZONTAL(R.string.gesture_two_finger_horizontal),
-    TWO_FINGER_TAP(R.string.gesture_two_finger_tap),
+/** 使い方に出す指の操作を、出す順に。label は絵の読み上げに使う操作の名前、hint はそれでできること、loopMs は絵の動きの 1 周の長さ。 */
+enum class GestureIcon(@StringRes val label: Int, @StringRes val hint: Int, val loopMs: Int) {
+    TAP(R.string.gesture_tap, R.string.hint_focus, 1600),
+    DOUBLE_TAP(R.string.gesture_double_tap, R.string.hint_light, 1800),
+    LONG_PRESS(R.string.gesture_long_press, R.string.hint_pause, 2000),
+    PINCH(R.string.gesture_pinch, R.string.hint_zoom, 1800),
+    TWO_FINGER_HORIZONTAL(R.string.gesture_two_finger_horizontal, R.string.hint_exposure, 2000),
+    TWO_FINGER_TAP(R.string.gesture_two_finger_tap, R.string.hint_full_screen, 1600),
 }
 
 /** 指 1 本。付け根 (x, y) から角度 angle(0 が真上で、正が時計回り)へ、長さ length・太さ width の両端の丸い棒で伸びる。 */
@@ -55,6 +54,13 @@ private val TWO = Hand(listOf(Digit(0f, 10.6f, 3.4f, -4f), Digit(3.6f, 11.4f, 3.
 /** 2 本の指を V の字に開いた手。 */
 private val SPREAD = Hand(listOf(Digit(-0.6f, 10.4f, 3.4f, -20f), Digit(3.8f, 11f, 3.4f, 18f)), CURLED_TWO, Offset(1.8f, -9f))
 
+/** そろえた 2 本(open = 0)から V の字(open = 1)までのあいだの手。 */
+private fun opened(open: Float) = Hand(
+    TWO.extended.zip(SPREAD.extended) { a, b -> Digit(lerp(a.x, b.x, open), lerp(a.length, b.length, open), a.width, lerp(a.angle, b.angle, open)) },
+    CURLED_TWO,
+    TWO.tip,
+)
+
 /** 指 1 本の絵で、触れている指先。 */
 private val TIP = Offset(10.5f, 7f)
 
@@ -62,58 +68,54 @@ private val TIP = Offset(10.5f, 7f)
 private const val CUT = 1f
 private const val RIPPLE = 1.5f
 private const val ARROW = 1.7f
+
+/** 浮いた高さ 1 あたりに手を大きくする割合。浮くと見る人へ近づき、押し込むと遠のく。 */
+private const val LIFT_GROW = 0.03f
 private val NAIL = Color(0xFFC9C5CE)
 
 /**
- * 指の操作 icon の絵。gap は絵を置く下地の色で、指のあいだの切れ目に使う。
+ * 指の操作 icon の、ループの進み t(0..1、GestureMotion)での絵。gap は絵を置く下地の色で、指のあいだの切れ目に使う。
  * タップの輪は 1 回なら 1 重、ダブルタップなら 2 重。長押しは押している長さを、満ちていく輪で表す。
  */
-internal fun DrawScope.gestureGlyph(icon: GestureIcon, gap: Color) = grid {
+internal fun DrawScope.gestureGlyph(icon: GestureIcon, gap: Color, t: Float = 0f) = grid {
+    val pose = GestureMotion.pose(icon, t)
     when (icon) {
-        GestureIcon.TAP -> {
-            ring(TIP, 3.6f)
-            hand(POINTING, TIP, gap)
-        }
-        GestureIcon.DOUBLE_TAP -> {
-            ring(TIP, 3.4f)
-            ring(TIP, 6.2f)
-            hand(POINTING, TIP, gap)
+        GestureIcon.TAP, GestureIcon.DOUBLE_TAP -> {
+            for (r in pose.ripples) ring(TIP, r.radius, r.alpha)
+            hand(POINTING, TIP, gap, lift = pose.lift)
         }
         GestureIcon.LONG_PRESS -> {
-            ring(TIP, 4.4f, alpha = 0.3f)
-            drawArc(ACCENT, -90f, 270f, false, TIP - Offset(4.4f, 4.4f), Size(8.8f, 8.8f), style = Stroke(RIPPLE, cap = StrokeCap.Round))
-            hand(POINTING, TIP, gap)
-        }
-        // 右端の線のすぐ内側に左手の人差し指を置き、反対側に上下の矢印を添える。
-        GestureIcon.EDGE_DRAG -> {
-            drawLine(INK.copy(alpha = 0.5f), Offset(21.8f, 1.6f), Offset(21.8f, 22.4f), 1.4f, StrokeCap.Round)
-            arrow(Offset(10.6f, 1.8f), Offset(10.6f, 10.2f), both = true)
-            hand(POINTING, Offset(16.6f, 8f), gap, scale = 0.84f, mirror = true)
+            ring(TIP, 4.4f, alpha = 0.3f * pose.fillAlpha)
+            drawArc(
+                ACCENT.copy(alpha = pose.fillAlpha), -90f, 360f * pose.fill, false, TIP - Offset(4.4f, 4.4f), Size(8.8f, 8.8f),
+                style = Stroke(RIPPLE, cap = StrokeCap.Round),
+            )
+            hand(POINTING, TIP, gap, lift = pose.lift)
         }
         GestureIcon.PINCH -> {
             arrow(Offset(7.6f, 4.2f), Offset(3.4f, 1.4f))
             arrow(Offset(16.4f, 4.2f), Offset(20.6f, 1.4f))
-            hand(SPREAD, Offset(12.2f, 7.9f), gap, scale = 0.86f)
-        }
-        GestureIcon.TWO_FINGER_VERTICAL -> {
-            arrow(Offset(20.4f, 2.4f), Offset(20.4f, 12.6f), both = true)
-            hand(TWO, Offset(10.4f, 6.8f), gap, scale = 0.9f)
+            hand(opened(pose.spread), Offset(12.2f, 7.9f), gap, scale = 0.86f)
         }
         GestureIcon.TWO_FINGER_HORIZONTAL -> {
             arrow(Offset(4.2f, 2.4f), Offset(19.8f, 2.4f), both = true)
-            hand(TWO, Offset(12f, 7.6f), gap, scale = 0.9f)
+            hand(TWO, Offset(12f + pose.slide, 7.6f), gap, scale = 0.9f)
         }
         GestureIcon.TWO_FINGER_TAP -> {
-            ring(Offset(12f, 7.2f), 4.8f)
-            hand(TWO, Offset(12f, 7.6f), gap, scale = 0.9f)
+            for (r in pose.ripples) ring(Offset(12f, 7.2f), r.radius, r.alpha)
+            hand(TWO, Offset(12f, 7.6f), gap, scale = 0.9f, lift = pose.lift)
         }
     }
 }
 
-/** hand を、指先 tip が at に来るよう scale 倍で描く。mirror なら左右を返して左手にする。親指を手のひらの奥に、指を小指から順に前へ重ねる。 */
-private fun DrawScope.hand(hand: Hand, at: Offset, gap: Color, scale: Float = 1f, mirror: Boolean = false) = withTransform({
-    translate(at.x, at.y)
-    scale(if (mirror) -scale else scale, scale, Offset.Zero)
+/**
+ * hand を、指先 tip が at に来るよう scale 倍で描く。lift だけ浮かせ、浮いた分だけ指先を中心に大きくする。
+ * 親指を手のひらの奥に、指を小指から順に前へ重ねる。
+ */
+private fun DrawScope.hand(hand: Hand, at: Offset, gap: Color, scale: Float = 1f, lift: Float = 0f) = withTransform({
+    val grown = scale * (1 + LIFT_GROW * lift)
+    translate(at.x, at.y - lift)
+    scale(grown, grown, Offset.Zero)
     translate(-hand.tip.x, -hand.tip.y)
 }) {
     digit(THUMB, gap)

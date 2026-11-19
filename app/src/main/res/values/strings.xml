@@ -42,9 +42,7 @@
     <string name="gesture_tap">タップ</string>
     <string name="gesture_double_tap">ダブルタップ</string>
     <string name="gesture_long_press">長押し</string>
-    <string name="gesture_edge_drag">右端の上下ドラッグ</string>
     <string name="gesture_pinch">ピンチ</string>
-    <string name="gesture_two_finger_vertical">2本指の上下ドラッグ</string>
     <string name="gesture_two_finger_horizontal">2本指の水平ドラッグ</string>
     <string name="gesture_two_finger_tap">2本指タップ</string>
 

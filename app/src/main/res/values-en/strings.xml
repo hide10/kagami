@@ -38,9 +38,7 @@
     <string name="gesture_tap">Tap</string>
     <string name="gesture_double_tap">Double tap</string>
     <string name="gesture_long_press">Long press</string>
-    <string name="gesture_edge_drag">Drag up or down on the right edge</string>
     <string name="gesture_pinch">Pinch</string>
-    <string name="gesture_two_finger_vertical">Two-finger drag up or down</string>
     <string name="gesture_two_finger_horizontal">Two-finger drag sideways</string>
     <string name="gesture_two_finger_tap">Two-finger tap</string>
 

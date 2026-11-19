@@ -1,8 +1,11 @@
 package com.kbcode.kagami.ui
 
-import androidx.annotation.StringRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -16,8 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -25,23 +30,10 @@ import androidx.compose.ui.unit.dp
 import com.kbcode.kagami.R
 import com.kbcode.kagami.billing.LogoBillingState
 
-/** 指の操作ひとつ。操作の絵と、それでできることの一言。 */
-private class Hint(val icons: List<GestureIcon>, @StringRes val text: Int)
-
-private val HINTS = listOf(
-    Hint(listOf(GestureIcon.TAP), R.string.hint_focus),
-    Hint(listOf(GestureIcon.DOUBLE_TAP), R.string.hint_light),
-    Hint(listOf(GestureIcon.LONG_PRESS), R.string.hint_pause),
-    Hint(listOf(GestureIcon.EDGE_DRAG, GestureIcon.PINCH, GestureIcon.TWO_FINGER_VERTICAL), R.string.hint_zoom),
-    Hint(listOf(GestureIcon.TWO_FINGER_HORIZONTAL), R.string.hint_exposure),
-    Hint(listOf(GestureIcon.TWO_FINGER_TAP), R.string.hint_full_screen),
-)
-
 /** 指の数と動きが見分けられる大きさ。 */
 private val ICON = 56.dp
-private val ICON_GAP = 4.dp
 
-/** 指の操作を絵と一言で示し、その下にロゴを消す買い切りを置く。一言は絵のすぐ右に続ける。外側のタップか「閉じる」で閉じる。 */
+/** 指の操作を 1 行に 1 つ、動く絵と一言で示し、その下にロゴを消す買い切りを置く。一言は絵のすぐ右に続ける。外側のタップか「閉じる」で閉じる。 */
 @Composable
 fun HelpDialog(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> Unit, onDismiss: () -> Unit) {
     val gap = AlertDialogDefaults.containerColor
@@ -51,15 +43,10 @@ fun HelpDialog(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> Un
         title = { Text(stringResource(R.string.help_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                for (hint in HINTS) {
+                for (icon in GestureIcon.entries) {
                     Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(ICON_GAP)) {
-                            for (icon in hint.icons) {
-                                val name = stringResource(icon.label)
-                                Canvas(Modifier.size(ICON).semantics { contentDescription = name }) { gestureGlyph(icon, gap) }
-                            }
-                        }
-                        Text(stringResource(hint.text), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        GestureLoop(icon, gap)
+                        Text(stringResource(icon.hint), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
                 HorizontalDivider(Modifier.padding(vertical = 12.dp))
@@ -67,4 +54,14 @@ fun HelpDialog(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> Un
             }
         },
     )
+}
+
+/** 指の操作の絵を、icon.loopMs で 1 周する動きで描き続ける。読むのは描くときだけなので、動いても組み直さない。 */
+@Composable
+private fun GestureLoop(icon: GestureIcon, gap: Color) {
+    val t by rememberInfiniteTransition(label = "gesture").animateFloat(
+        0f, 1f, infiniteRepeatable(tween(icon.loopMs, easing = LinearEasing)), label = "loop",
+    )
+    val name = stringResource(icon.label)
+    Canvas(Modifier.size(ICON).semantics { contentDescription = name }) { gestureGlyph(icon, gap, t) }
 }
