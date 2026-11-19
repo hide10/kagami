@@ -235,12 +235,11 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
             val s = vm.state.value
             when (g) {
                 is Gesture.Tap -> {
-                    // 寄るのと同じ点にピントと露出を合わせる。止めた一枚はカメラの今の映像ではないので合わせない。
+                    // タップはピントと露出を合わせるだけで、ズームは動かさない。止めた一枚はカメラの今の映像ではないので合わせない。
                     if (!s.frozen) {
                         val seen = crop.toSource(g.at, size)
                         if (focus.at(seen, frame.mapping, crop.zoom)) focused = FocusMark(seen)
                     }
-                    vm.moveTo(CropPlanner.tap(g.at, crop, size, s.extent(size)))
                 }
                 Gesture.LongPress -> {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -360,7 +359,7 @@ private fun Density.thumbY(zoom: Float, height: Float): Float {
 /**
  * 右端の寄り引きのスライダー。細い線の上の「+」のつまみが今の倍率を対数で示し、寄っているあいだは横に倍率を出す。
  * つまみを掴んでも帯のどこをなぞっても、指が動いた分だけ寄り引きするので、つまみは指についてくる。
- * 帯で始まった指はここで受け止めるので、プレビューを動かしもタップで寄りもしない。
+ * 帯で始まった指はここで受け止めるので、プレビューを動かしはしない。
  * 線は戻るジェスチャーの幅にかかるので、つまみの上下だけ戻るジェスチャーを止め、画面の端から掴んでも帯が受け取る。
  */
 @Composable
@@ -546,7 +545,7 @@ private fun LightBand(light: ScreenLight, glow: Color) {
 /** ピントを合わせた点(画像全体を倍率 1 で見たビュー座標)。タップのたびに作り直すので、同じ点をもう一度タップしても印が出直す。 */
 private class FocusMark(val at: Pt)
 
-/** 合わせた点に二重の輪を出し、FOCUS_FADE_MS で消す。輪は映像と一緒に動くので、その点へ寄っていくあいだも合わせた所に重なる。 */
+/** 合わせた点に二重の輪を出し、FOCUS_FADE_MS で消す。輪は映像と一緒に動くので、そのあと寄り引きしても合わせた所に重なる。 */
 @Composable
 private fun FocusRing(mark: FocusMark?, crop: () -> Crop, view: Size) {
     val fade = remember { Animatable(0f) }

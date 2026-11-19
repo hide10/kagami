@@ -87,10 +87,6 @@ class MirrorStateTest {
         assertTrue(pinched.frozen)
         assertEquals(6f, pinched.target!!.zoom, 1e-4f)
 
-        val tapped = frozen.moveTo(CropPlanner.tap(Pt(700f, 1000f), dragged, PHONE))
-        assertTrue(tapped.frozen)
-        assertPt(PHONE.center, screenOf(dragged.toSource(Pt(700f, 1000f), PHONE), tapped.target!!, PHONE))
-
         val whole = frozen.showAll()
         assertTrue(whole.frozen)
         assertNull(whole.target)

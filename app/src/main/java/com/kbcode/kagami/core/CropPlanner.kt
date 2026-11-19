@@ -1,18 +1,8 @@
 package com.kbcode.kagami.core
 
 import com.kbcode.kagami.core.Crop.Companion.MAX_ZOOM
-import kotlin.math.max
 
 object CropPlanner {
-    /** タップした点へ寄るときの倍率。 */
-    const val POINT_ZOOM = 2.5f
-
-    /** タップした点を真ん中へ運び、POINT_ZOOM まで寄る。いまそれより寄っていれば倍率は保つ。bounds(既定は画像全体)の外は見せない。 */
-    fun tap(screen: Pt, shown: Crop, size: Size, bounds: Crop = Crop.full(size)): Crop {
-        val p = shown.toSource(screen, size)
-        return Crop(p.x, p.y, max(shown.zoom, POINT_ZOOM)).clamp(size, bounds)
-    }
-
     /** 部位を画面の真ん中に置き、両目の間隔が画面幅の part.eyeFrac に見えるまで寄る。face はビュー座標。 */
     fun zoomOnPart(part: FacePart, face: FaceLandmarks, size: Size): Crop {
         val p = part.landmark(face)

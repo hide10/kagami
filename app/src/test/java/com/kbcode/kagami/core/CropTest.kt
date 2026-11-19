@@ -60,15 +60,6 @@ class CropTest {
     }
 
     @Test
-    fun aTappedPointEndsUpInTheMiddleOnceTheViewHasZoomedToIt() {
-        val shown = Crop(400f, 900f, 1.5f)
-        val tapped = shown.toSource(Pt(800f, 500f), PHONE)
-        val target = CropPlanner.tap(Pt(800f, 500f), shown, PHONE)
-        assertPt(Pt(800f, 500f), shown.toScreen(tapped, PHONE))
-        assertPt(PHONE.center, target.toScreen(tapped, PHONE))
-    }
-
-    @Test
     fun clampInsideAFrameKeepsTheCropWithinThatFrame() {
         val frame = Crop(300f, 700f, 2.5f)
         repeat(2000) {

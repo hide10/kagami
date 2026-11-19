@@ -3,7 +3,7 @@ package com.kbcode.kagami.core
 /**
  * target は見せたい切り出しで、null は全体。動かすのはボタンと指だけで、顔を追いかけはしない。
  * pendingPart は押された部位ボタンで、顔が見つかったときに一度だけ寄る。
- * shownPart は最後に寄った部位で、target はその部位の切り出し。指やタップで動かすか全体に戻すと null になる。
+ * shownPart は最後に寄った部位で、target はその部位の切り出し。ピンチや縦ドラッグ、スライダーなどの指で動かすか全体に戻すと null になる。
  * still は止めた一枚を映しているあいだ、その一枚にカメラが切り出していた範囲(ビュー座標)。止めているあいだはその範囲が全体になる。
  * 部位はカメラの今の顔で決めるので、止めているあいだは寄れない。
  * fullScreen は全面鏡モードで、ボタンと帯とパネルを隠して映像を画面いっぱいに映す。指の操作はふだんと同じに使える。
@@ -58,7 +58,7 @@ data class MirrorState(
 
     fun showAll() = copy(target = null, pendingPart = null, shownPart = null)
 
-    /** タップや指で決めた切り出し。押したばかりの部位ボタンも、寄っていた部位も外す。 */
+    /** ピンチ・2 本指・縦ドラッグ・右端のスライダーで決めた切り出し。押したばかりの部位ボタンも、寄っていた部位も外す。 */
     fun moveTo(crop: Crop) = copy(target = crop, pendingPart = null, shownPart = null)
 
     /** 顔が見つかるまで見え方は変えない。続けて押せば最後の部位が残る。止めているあいだは受け付けない。 */
