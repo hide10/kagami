@@ -106,53 +106,57 @@ suspend fun runFrontCamera(
 
     // 解析は撮影結果を少し待つことがあるので、メインスレッドでは回さない。
     val analysisThread = Executors.newSingleThreadExecutor()
-    analysis.setAnalyzer(analysisThread, analyzer)
-    val camera = provider.bindToLifecycle(owner, selector, preview, analysis)
-    val stream = preview.resolutionInfo?.resolution
-    Log.i(
-        TAG,
-        "preview $stream analysis ${analysis.resolutionInfo?.resolution} " +
-            "stabilization $stabilized noiseReduction ${if (highQualityNr) "HIGH_QUALITY" else "default"} " +
-            "edge ${if (highQualityEdge) "HIGH_QUALITY" else "default"}",
-    )
-    val active = characteristics.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
-    val maxDigitalZoom = characteristics.getCameraCharacteristic(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)
-    val cropping = characteristics.getCameraCharacteristic(CameraCharacteristics.SCALER_CROPPING_TYPE)
-    val spec = SensorSpec.of(
-        activeWidth = active?.width(),
-        activeHeight = active?.height(),
-        maxDigitalZoom = maxDigitalZoom,
-        freeform = cropping == CameraMetadata.SCALER_CROPPING_TYPE_FREEFORM,
-        streamWidth = stream?.width,
-        streamHeight = stream?.height,
-        rotationDegrees = info.getSensorRotationDegrees(preview.targetRotation),
-        mirror = true,
-    )
-    Log.i(
-        TAG,
-        "crop activeArray ${active?.width()}x${active?.height()} maxDigitalZoom $maxDigitalZoom " +
-            "zoomStateMax ${info.zoomState.value?.maxZoomRatio} cropping ${if (cropping == CameraMetadata.SCALER_CROPPING_TYPE_FREEFORM) "FREEFORM" else "CENTER_ONLY"} " +
-            "rotation ${info.getSensorRotationDegrees(preview.targetRotation)} " +
-            (spec?.let { "base ${it.baseWidth}x${it.baseHeight} cameraZoomLimit ${it.zoomLimit}" } ?: "unsupported: the app magnifies everything"),
-    )
-    crop.spec = spec
-    // 切り出せるときだけ、base に対する比を Preview と同じ比の点にする factory を作る。Preview はつないだあとなので比が決まっている。
-    focus.attach(camera, view, spec?.let { SurfaceOrientedMeteringPointFactory(1f, 1f, preview) })
-    val control = Camera2CameraControl.from(camera.cameraControl)
+    // bindToLifecycle が失敗しても解析スレッドは必ず止める。
     try {
-        // StateFlow は同じ値を流さず、待っているあいだに来た値は最後の一つだけ残る。動いている最中は 1 フレームに 1 度、止まれば最後の範囲が必ず届く。
-        crop.requested.filterNotNull().collect { rect ->
-            control.setCaptureRequestOptions(
-                CaptureRequestOptions.Builder()
-                    .setCaptureRequestOption(CaptureRequest.SCALER_CROP_REGION, Rect(rect.left, rect.top, rect.right, rect.bottom))
-                    .build(),
-            )
-            delay(REQUEST_INTERVAL_MS)
+        analysis.setAnalyzer(analysisThread, analyzer)
+        val camera = provider.bindToLifecycle(owner, selector, preview, analysis)
+        val stream = preview.resolutionInfo?.resolution
+        Log.i(
+            TAG,
+            "preview $stream analysis ${analysis.resolutionInfo?.resolution} " +
+                "stabilization $stabilized noiseReduction ${if (highQualityNr) "HIGH_QUALITY" else "default"} " +
+                "edge ${if (highQualityEdge) "HIGH_QUALITY" else "default"}",
+        )
+        val active = characteristics.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+        val maxDigitalZoom = characteristics.getCameraCharacteristic(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)
+        val cropping = characteristics.getCameraCharacteristic(CameraCharacteristics.SCALER_CROPPING_TYPE)
+        val spec = SensorSpec.of(
+            activeWidth = active?.width(),
+            activeHeight = active?.height(),
+            maxDigitalZoom = maxDigitalZoom,
+            freeform = cropping == CameraMetadata.SCALER_CROPPING_TYPE_FREEFORM,
+            streamWidth = stream?.width,
+            streamHeight = stream?.height,
+            rotationDegrees = info.getSensorRotationDegrees(preview.targetRotation),
+            mirror = true,
+        )
+        Log.i(
+            TAG,
+            "crop activeArray ${active?.width()}x${active?.height()} maxDigitalZoom $maxDigitalZoom " +
+                "zoomStateMax ${info.zoomState.value?.maxZoomRatio} cropping ${if (cropping == CameraMetadata.SCALER_CROPPING_TYPE_FREEFORM) "FREEFORM" else "CENTER_ONLY"} " +
+                "rotation ${info.getSensorRotationDegrees(preview.targetRotation)} " +
+                (spec?.let { "base ${it.baseWidth}x${it.baseHeight} cameraZoomLimit ${it.zoomLimit}" } ?: "unsupported: the app magnifies everything"),
+        )
+        crop.spec = spec
+        // 切り出せるときだけ、base に対する比を Preview と同じ比の点にする factory を作る。Preview はつないだあとなので比が決まっている。
+        focus.attach(camera, view, spec?.let { SurfaceOrientedMeteringPointFactory(1f, 1f, preview) })
+        val control = Camera2CameraControl.from(camera.cameraControl)
+        try {
+            // StateFlow は同じ値を流さず、待っているあいだに来た値は最後の一つだけ残る。動いている最中は 1 フレームに 1 度、止まれば最後の範囲が必ず届く。
+            crop.requested.filterNotNull().collect { rect ->
+                control.setCaptureRequestOptions(
+                    CaptureRequestOptions.Builder()
+                        .setCaptureRequestOption(CaptureRequest.SCALER_CROP_REGION, Rect(rect.left, rect.top, rect.right, rect.bottom))
+                        .build(),
+                )
+                delay(REQUEST_INTERVAL_MS)
+            }
+        } finally {
+            focus.detach()
+            crop.spec = null
+            provider.unbind(preview, analysis)
         }
     } finally {
-        focus.detach()
-        crop.spec = null
-        provider.unbind(preview, analysis)
         analysisThread.shutdown()
     }
 }

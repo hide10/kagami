@@ -5,6 +5,7 @@
     <string name="camera_permission_reason">The camera is used only as a mirror. Video is never saved or sent.</string>
     <string name="camera_permission_allow">Allow camera</string>
     <string name="no_front_camera">No front camera found</string>
+    <string name="camera_start_failed">Couldn\'t start the camera</string>
 
     <string name="button_light">Light</string>
     <string name="button_pause">Pause</string>

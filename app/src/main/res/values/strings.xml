@@ -6,6 +6,7 @@
     <string name="camera_permission_reason">鏡として映すためにカメラを使います。映像は保存も送信もしません。</string>
     <string name="camera_permission_allow">カメラを許可する</string>
     <string name="no_front_camera">前面カメラが見つかりません</string>
+    <string name="camera_start_failed">カメラを起動できませんでした</string>
 
     <string name="button_light">ライト</string>
     <string name="button_pause">静止</string>

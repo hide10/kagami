@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.os.SystemClock
 import android.view.View
 import android.view.WindowManager
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.view.PreviewView
@@ -121,6 +122,7 @@ import com.kbcode.kagami.camera.CameraCrop
 import com.kbcode.kagami.camera.CameraFocus
 import com.kbcode.kagami.camera.FaceAnalyzer
 import com.kbcode.kagami.camera.runFrontCamera
+import kotlinx.coroutines.CancellationException
 import com.kbcode.kagami.core.ColorAdjust
 import com.kbcode.kagami.core.Crop
 import com.kbcode.kagami.core.CropPlanner
@@ -572,12 +574,23 @@ private fun CameraPreview(view: PreviewView, color: ColorAdjust, analyzer: Image
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var noCamera by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     LaunchedEffect(view, analyzer, crop, focus) {
-        runFrontCamera(context, owner, view, analyzer, crop, focus)
-        noCamera = true
+        try {
+            runFrontCamera(context, owner, view, analyzer, crop, focus)
+            noCamera = true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 初期化や bind の失敗で落とさず、案内に移る。前面カメラが無い場合とは文言を分ける。
+            Log.e("Kagami", "front camera failed", e)
+            failed = true
+        }
     }
-    if (noCamera) {
-        Box(modifier, Alignment.Center) { Text(stringResource(R.string.no_front_camera), color = Color.White) }
+    if (noCamera || failed) {
+        Box(modifier, Alignment.Center) {
+            Text(stringResource(if (failed) R.string.camera_start_failed else R.string.no_front_camera), color = Color.White)
+        }
     } else {
         AndroidView({ view }, modifier) { it.tint(color) }
     }
