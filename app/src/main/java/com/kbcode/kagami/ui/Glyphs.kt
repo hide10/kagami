@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.PathParser
 import com.kbcode.kagami.core.FacePart
@@ -123,4 +124,11 @@ internal fun DrawScope.slidersGlyph(active: Boolean) = grid {
         drawLine(c, Offset(3.5f, y), Offset(20.5f, y), 1.6f, StrokeCap.Round)
         drawCircle(c, 2.4f, Offset(knob, y))
     }
+}
+
+/** 丸と 8 本の光の太陽。露出の帯の端に添える。 */
+internal fun DrawScope.sunGlyph() = grid {
+    val c = Offset(12f, 12f)
+    drawCircle(INK, 4.4f, c, style = Stroke(1.8f))
+    for (i in 0 until 8) rotate(i * 45f, c) { drawLine(INK, Offset(12f, 2.6f), Offset(12f, 4.8f), 1.8f, StrokeCap.Round) }
 }

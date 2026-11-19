@@ -47,6 +47,24 @@ class ColorAdjustTest {
     }
 
     @Test
+    fun theExposureBarRunsFromDarkestOnTheLeftThroughUntouchedInTheMiddle() {
+        assertEquals(0f, ColorAdjust().withExposure(-2f).exposureFraction, 1e-6f)
+        assertEquals(0.5f, ColorAdjust().exposureFraction, 1e-6f)
+        assertEquals(0.75f, ColorAdjust().withExposure(1f).exposureFraction, 1e-6f)
+        assertEquals(1f, ColorAdjust().withExposure(2f).exposureFraction, 1e-6f)
+    }
+
+    @Test
+    fun theExposureBarStopsOnEveryThirdOfAStopAndOnUntouched() {
+        // スライダーは両端と EV_TICKS 個の目盛りを等しい間隔で並べる。
+        val positions = ColorAdjust.EV_TICKS + 2
+        val stops = (0 until positions).map { -2f + 4f * it / (positions - 1) }
+        assertEquals(1f / 3f, stops[1] - stops[0], 1e-6f)
+        for (ev in stops) assertEquals(ev, ColorAdjust().withExposure(ev).exposureEv, 1e-6f)
+        assertTrue(stops.any { ColorAdjust().withExposure(it).isNeutral })
+    }
+
+    @Test
     fun draggingRightBrightensAndAcrossTheWholeWidthCoversTheWholeRange() {
         val width = 1080f
         assertEquals(1f, ColorAdjust().withExposureDragged(0f, width / 4, width).exposureEv, 1e-6f)

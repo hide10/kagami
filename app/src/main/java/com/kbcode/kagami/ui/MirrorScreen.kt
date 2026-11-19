@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -46,6 +47,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -296,7 +298,8 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
                     },
                     Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(TRACK_WIDTH),
                 )
-                // 試用版の文字は部位の帯のすぐ上の左端に置き、左の戻るジェスチャーの幅だけ内側へ寄せる。全面のあいだはほかの UI と一緒に隠れる。
+                // 試用版の文字は露出の帯のすぐ上の左端に置き、左の戻るジェスチャーの幅だけ内側へ寄せる。押せないので、下のプレビューへの指は遮らない。
+                // 全面のあいだはほかの UI と一緒に隠れる。
                 if (billing.showLogo) {
                     TrialLogo(
                         Modifier.align(Alignment.BottomStart)
@@ -305,6 +308,7 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
                     )
                 }
             }
+            ExposureBar(state.color, vm)
             PartBar(state, vm) { part ->
                 if (vm.request(part)) {
                     val press = ++presses
@@ -412,6 +416,60 @@ private val ZOOM_LABEL = TextStyle(
     fontSize = 12.sp,
     shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 4f),
 )
+
+/**
+ * 部位の帯のすぐ上に置く露出のスライダー。2 本指の横なぞりと色・明るさのパネルと同じ露出を動かすので、どれで変えても揃って動く。
+ * 止めた一枚にも色はかかるので、止めているあいだも動かせる。指 1 本ぶんの高さを掴めて、左右の端は戻るジェスチャーの幅だけ内側へ寄せる。
+ * 端に太陽の印を添え、無加工でないあいだだけ反対の端に段数を出す。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExposureBar(color: ColorAdjust, vm: MirrorViewModel) {
+    val name = stringResource(R.string.exposure)
+    Row(
+        Modifier.fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Horizontal))
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Canvas(Modifier.size(20.dp).alpha(0.85f)) { sunGlyph() }
+        Slider(
+            value = color.exposureEv,
+            onValueChange = { v -> vm.adjustColor { it.withExposure(v) } },
+            modifier = Modifier.weight(1f).semantics { contentDescription = name },
+            steps = ColorAdjust.EV_TICKS,
+            thumb = { ExposureThumb() },
+            track = { ExposureTrack(color) },
+            valueRange = ColorAdjust.EV,
+        )
+        Text(
+            if (color.exposureEv == 0f) "" else stringResource(R.string.exposure_value, color.exposureEv),
+            Modifier.width(56.dp),
+            style = ZOOM_LABEL,
+            textAlign = TextAlign.End,
+        )
+    }
+}
+
+/** 露出のつまみ。寄り引きのつまみと同じ白い丸で、ひと回り小さい。 */
+@Composable
+private fun ExposureThumb() = Canvas(Modifier.size(22.dp)) {
+    drawCircle(THUMB_INK.copy(alpha = 0.5f), size.minDimension / 2)
+    drawCircle(Color.White.copy(alpha = 0.92f), size.minDimension / 2 - 1.5.dp.toPx())
+}
+
+/** 露出の線。寄り引きの線と同じ縁取りで、真ん中の無加工の点から今の露出までを ACCENT で塗る。 */
+@Composable
+private fun ExposureTrack(color: ColorAdjust) = Canvas(Modifier.fillMaxWidth().height(4.dp)) {
+    val y = size.height / 2
+    val start = Offset(0f, y)
+    val end = Offset(size.width, y)
+    drawLine(Color.Black.copy(alpha = 0.3f), start, end, 4.dp.toPx(), StrokeCap.Round)
+    drawLine(Color.White.copy(alpha = 0.5f), start, end, 2.dp.toPx(), StrokeCap.Round)
+    val middle = Offset(size.width / 2, y)
+    drawLine(ACCENT, middle, Offset(size.width * color.exposureFraction, y), 2.dp.toPx(), StrokeCap.Round)
+    drawCircle(Color.White, 2.dp.toPx(), middle)
+}
 
 /** ライトが点いているあいだは画面の明るさを最大にし、消えたら端末の設定に戻す。光らせ方を変えても続く。 */
 @Composable

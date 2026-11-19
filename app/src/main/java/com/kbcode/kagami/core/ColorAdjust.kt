@@ -37,8 +37,11 @@ object Kelvin {
 data class ColorAdjust(val exposureEv: Float = 0f, val kelvin: Float = Kelvin.NEUTRAL) {
     val isNeutral get() = exposureEv == 0f && kelvin == Kelvin.NEUTRAL
 
+    /** 露出のスライダーで今の露出がある位置。左端(EV の下限)が 0、真ん中(無加工)が 0.5、右端が 1。 */
+    val exposureFraction get() = (exposureEv - EV.start) / (EV.endInclusive - EV.start)
+
     /** 1/3 段刻みに丸めるので、真ん中付近へ戻せば無加工に戻る。 */
-    fun withExposure(ev: Float) = copy(exposureEv = (ev.coerceIn(EV) * 3f).roundToInt() / 3f)
+    fun withExposure(ev: Float) = copy(exposureEv = (ev.coerceIn(EV) * STOPS_PER_EV).roundToInt() / STOPS_PER_EV)
 
     /** 動かし始めに fromEv だった露出を、指で横へ dx 動かしたあと。幅 width いっぱいで EV の端から端まで動き、右へ動かすと明るい。 */
     fun withExposureDragged(fromEv: Float, dx: Float, width: Float) = withExposure(fromEv + dx / width * (EV.endInclusive - EV.start))
@@ -60,6 +63,12 @@ data class ColorAdjust(val exposureEv: Float = 0f, val kelvin: Float = Kelvin.NE
     companion object {
         val EV = -2f..2f
         val KELVIN = 3000f..10000f
+
+        /** 露出を丸める刻み。1 段を 3 つに分ける。 */
+        private const val STOPS_PER_EV = 3f
+
+        /** 露出のスライダーの両端のあいだに置く目盛りの数。目盛りは withExposure が丸める刻みごとに並ぶ。 */
+        val EV_TICKS = ((EV.endInclusive - EV.start) * STOPS_PER_EV).roundToInt() - 1
     }
 }
 
