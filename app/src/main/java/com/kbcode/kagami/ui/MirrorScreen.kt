@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,11 +36,11 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.systemGestures
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -82,6 +83,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -94,6 +96,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -131,6 +135,7 @@ import com.kbcode.kagami.core.Size
 import com.kbcode.kagami.core.TouchReader
 import com.kbcode.kagami.core.TouchRules
 import com.kbcode.kagami.core.ZoomStrip
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 @Composable
@@ -275,9 +280,8 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
         if (state.glowing == LightMode.BAND) LightBand(light, glow)
         if (!state.fullScreen) Column(Modifier.fillMaxSize()) {
             FunctionRow(state, vm, helping = help, onFreeze = ::toggleFreeze, onHelp = { help = true })
-            // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。戻るジェスチャーの幅だけ内側へ寄せる。
-            val edge = WindowInsets.safeDrawing.union(WindowInsets.systemGestures).only(WindowInsetsSides.Horizontal)
-            Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(edge)) {
+            // 帯は縮めるカードの外に置くので、ライトの光らせ方によらず画面の右端にある。戻るジェスチャーの幅の上にも重ね、切り欠きだけ避ける。
+            Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
                 ZoomTrack(
                     zoom = { crop.zoom },
                     onDrag = { dy, length ->
@@ -286,8 +290,14 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
                     },
                     Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(TRACK_WIDTH),
                 )
-                // 試用版の文字は部位の帯のすぐ上の左端に置く。全面のあいだはほかの UI と一緒に隠れ、映像だけになる。
-                if (billing.showLogo) TrialLogo(Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 4.dp))
+                // 試用版の文字は部位の帯のすぐ上の左端に置き、左の戻るジェスチャーの幅だけ内側へ寄せる。全面のあいだはほかの UI と一緒に隠れる。
+                if (billing.showLogo) {
+                    TrialLogo(
+                        Modifier.align(Alignment.BottomStart)
+                            .windowInsetsPadding(WindowInsets.systemGestures.only(WindowInsetsSides.Start))
+                            .padding(start = 8.dp, bottom = 4.dp),
+                    )
+                }
             }
             PartBar(state, vm) { part ->
                 if (vm.request(part)) {
@@ -310,21 +320,34 @@ fun MirrorScreen(billing: LogoBillingState, onBuy: () -> Unit, onRestore: () -> 
 
 private val CARD = RoundedCornerShape(24.dp)
 
-/** 帯の幅で、指で押せる範囲。48dp より広くとる。 */
-private val TRACK_WIDTH = 56.dp
+/** 帯の幅で、指で押せる範囲。画面の右端から線の内側へ指 1 本ぶん広げ、戻るジェスチャーの幅より内側から始めても掴める。 */
+private val TRACK_WIDTH = 72.dp
+
+/** 画面の右端から線までの距離。つまみの縁が端から 4.5dp だけ離れて見える。 */
+private val LINE_FROM_EDGE = 24.dp
 
 private val THUMB_RADIUS = 18.dp
 
 /** 帯の両端の余白。つまみが端で欠けないだけ空ける。 */
 private val TRACK_INSET = THUMB_RADIUS + 2.dp
 
+/** つまみの上下で戻るジェスチャーを止める高さ。Android は画面の端ごとに 200dp までしか止めないので、それより短くする。 */
+private val GUARD = 160.dp
+
 /** つまみの「+」と縁取り。光っている周りの上でも白いつまみの形が見える濃さ。 */
 private val THUMB_INK = Color(0xFF424242)
+
+/** 高さ height の帯で、zoom 倍を示すつまみの中心。 */
+private fun Density.thumbY(zoom: Float, height: Float): Float {
+    val inset = TRACK_INSET.toPx()
+    return height - inset - ZoomStrip.thumb(zoom) * (height - 2 * inset)
+}
 
 /**
  * 右端の寄り引きのスライダー。細い線の上の「+」のつまみが今の倍率を対数で示し、寄っているあいだは横に倍率を出す。
  * つまみを掴んでも帯のどこをなぞっても、指が動いた分だけ寄り引きするので、つまみは指についてくる。
  * 帯で始まった指はここで受け止めるので、プレビューを動かしもタップで寄りもしない。
+ * 線は戻るジェスチャーの幅にかかるので、つまみの上下だけ戻るジェスチャーを止め、画面の端から掴んでも帯が受け取る。
  */
 @Composable
 private fun ZoomTrack(zoom: () -> Float, onDrag: (dy: Float, length: Float) -> Unit, modifier: Modifier) {
@@ -341,14 +364,14 @@ private fun ZoomTrack(zoom: () -> Float, onDrag: (dy: Float, length: Float) -> U
                 }
             }
             .drawBehind {
-                val x = size.width / 2
+                val x = size.width - LINE_FROM_EDGE.toPx()
                 val top = TRACK_INSET.toPx()
                 val bottom = size.height - top
                 // 暗い縁取りの上に明るい線を引くので、プレビューの上でも光った周りの上でも見える。
                 drawLine(Color.Black.copy(alpha = 0.3f), Offset(x, top), Offset(x, bottom), 4.dp.toPx(), StrokeCap.Round)
                 drawLine(Color.White.copy(alpha = 0.5f), Offset(x, top), Offset(x, bottom), 2.dp.toPx(), StrokeCap.Round)
                 val z = zoom()
-                val thumb = Offset(x, bottom - ZoomStrip.thumb(z) * (bottom - top))
+                val thumb = Offset(x, thumbY(z, size.height))
                 val r = THUMB_RADIUS.toPx()
                 drawCircle(THUMB_INK.copy(alpha = 0.5f), r + 1.5.dp.toPx(), thumb)
                 drawCircle(Color.White.copy(alpha = 0.92f), r, thumb)
@@ -362,7 +385,19 @@ private fun ZoomTrack(zoom: () -> Float, onDrag: (dy: Float, length: Float) -> U
                     drawText(label, topLeft = at)
                 }
             },
-    )
+    ) {
+        // つまみが動くと置き直すだけなので、毎フレーム倍率が変わっても測り直しはしない。
+        Spacer(
+            Modifier.layout { measurable, constraints ->
+                val height = constraints.maxHeight
+                val span = min(GUARD.roundToPx(), height)
+                val guard = measurable.measure(Constraints.fixed(constraints.maxWidth, span))
+                layout(constraints.maxWidth, height) {
+                    guard.place(0, ZoomStrip.guardTop(thumbY(zoom(), height.toFloat()), span.toFloat(), height.toFloat()).roundToInt())
+                }
+            }.systemGestureExclusion(),
+        )
+    }
 }
 
 /** 倍率の文字。プレビューの明るいところでも読めるよう、薄い影をつける。 */

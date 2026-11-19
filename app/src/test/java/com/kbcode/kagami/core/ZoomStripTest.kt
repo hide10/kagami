@@ -74,6 +74,26 @@ class ZoomStripTest {
     }
 
     @Test
+    fun theBackGestureIsHeldOffAroundTheThumb() {
+        assertEquals(420f, ZoomStrip.guardTop(500f, 160f, 1000f), 0f)
+    }
+
+    @Test
+    fun theHeldOffRangeStaysOnTheStripAndStillCoversTheThumbAtItsEnds() {
+        assertEquals(0f, ZoomStrip.guardTop(20f, 160f, 1000f), 0f)
+        assertEquals(840f, ZoomStrip.guardTop(980f, 160f, 1000f), 0f)
+        for (y in 0..1000 step 10) {
+            val top = ZoomStrip.guardTop(y.toFloat(), 160f, 1000f)
+            assertTrue("$y -> $top", top >= 0f && top + 160f <= 1000f && y.toFloat() in top..top + 160f)
+        }
+    }
+
+    @Test
+    fun aStripShorterThanTheRangeIsHeldOffWhole() {
+        assertEquals(0f, ZoomStrip.guardTop(50f, 160f, 100f), 0f)
+    }
+
+    @Test
     fun theThumbMovesAsFarAsTheFinger() {
         val from = Crop(540f, 960f, 2f)
         val to = ZoomStrip.drag(from, -0.3f * length, length, PHONE)

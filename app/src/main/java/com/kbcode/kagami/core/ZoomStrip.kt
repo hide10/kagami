@@ -2,6 +2,7 @@ package com.kbcode.kagami.core
 
 import com.kbcode.kagami.core.Crop.Companion.MAX_ZOOM
 import kotlin.math.ln
+import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -16,6 +17,12 @@ object ZoomStrip {
 
     /** zoom 倍を示すつまみの位置。0 が下端(1 倍)、1 が上端(MAX_ZOOM 倍)で、なぞった指と同じだけ動く。 */
     fun thumb(zoom: Float): Float = (ln(zoom) / ln(MAX_ZOOM)).coerceIn(0f, 1f)
+
+    /**
+     * 高さ height の帯のうち、戻るジェスチャーから外す高さ span の範囲の上端。つまみの中心 thumbY を真ん中にとり、
+     * 帯からはみ出すなら内側へずらす。帯が span より短ければ帯全体になる。
+     */
+    fun guardTop(thumbY: Float, span: Float, height: Float): Float = (thumbY - span / 2).coerceIn(0f, max(0f, height - span))
 
     /** つまみの横に出す倍率。0.1 倍刻みで、全体を映しているあいだは出さない。端末の言語によらず小数点で書く。 */
     fun label(zoom: Float): String? {
