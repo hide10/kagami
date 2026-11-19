@@ -12,10 +12,13 @@ import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.face.FaceLandmark
+import com.kbcode.kagami.core.FaceBox
 import com.kbcode.kagami.core.FaceLandmarks
 import com.kbcode.kagami.core.Pt
+import com.kbcode.kagami.core.RawLandmarks
 import com.kbcode.kagami.core.SensorRect
 import com.kbcode.kagami.core.Size
+import com.kbcode.kagami.core.completeLandmarks
 import com.kbcode.kagami.core.uprightSize
 import java.util.concurrent.atomic.AtomicReference
 
@@ -96,10 +99,8 @@ class FaceAnalyzer(private val crop: CameraCrop) : ImageAnalysis.Analyzer, AutoC
 
 private fun Face.landmarks(): FaceLandmarks? {
     fun at(type: Int) = getLandmark(type)?.position?.let { Pt(it.x, it.y) }
-    val leftEye = at(FaceLandmark.LEFT_EYE) ?: return null
-    val rightEye = at(FaceLandmark.RIGHT_EYE) ?: return null
-    val nose = at(FaceLandmark.NOSE_BASE) ?: return null
-    val mouthLeft = at(FaceLandmark.MOUTH_LEFT) ?: return null
-    val mouthRight = at(FaceLandmark.MOUTH_RIGHT) ?: return null
-    return FaceLandmarks(leftEye, rightEye, nose, mouthLeft.midTo(mouthRight))
+    val b = boundingBox
+    val raw = RawLandmarks(at(FaceLandmark.LEFT_EYE), at(FaceLandmark.RIGHT_EYE), at(FaceLandmark.NOSE_BASE), at(FaceLandmark.MOUTH_LEFT), at(FaceLandmark.MOUTH_RIGHT))
+    // 一部が欠けた顔でも、取れたものと外接矩形から補って部位ボタンで寄れるようにする。
+    return completeLandmarks(raw, FaceBox(b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.bottom.toFloat()))
 }
